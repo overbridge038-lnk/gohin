@@ -79,13 +79,20 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
 <main>
   <!-- 照合画面 -->
   <section id="viewMain">
+    <div class="card hidden" id="sendBanner" style="background:#fef3c7;border:2px solid #f59e0b">
+      <div style="font-weight:700;font-size:16px">🌐 オンラインです。未送信の記録が <span id="bnCnt">0</span>件あります</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" style="flex:1;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 Googleドライブへ送る</button>
+        <button class="btn gray" onclick="document.getElementById('sendBanner').classList.add('hidden')">あとで</button>
+      </div>
+    </div>
     <div class="card">
       <div class="modes">
         <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
@@ -150,9 +157,19 @@ h2{font-size:16px;margin:4px 0 10px}
     </div>
 
     <div class="card">
-      <h2>照合履歴（新しい順）</h2>
+      <h2>照合記録（日付ごと・新しい順）</h2>
       <div class="row">
-        <button class="btn" onclick="exportCsv()">CSV出力</button>
+        <select id="daySel" onchange="changeDay(this.value)" style="flex:1;min-width:140px;padding:10px;font-size:16px;border:1px solid #d1d5db;border-radius:8px"></select>
+      </div>
+      <div id="daySum" style="font-size:14px;margin:4px 0 8px"></div>
+      <div class="row">
+        <button class="btn" onclick="exportCsv('day')">この日のCSVを保存</button>
+        <button class="btn gray" onclick="exportCsv('all')">全期間のCSV</button>
+      </div>
+      <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">
+        <div style="font-size:15px">送信状況：<b id="unsentTxt">確認中…</b></div>
+        <button class="btn" style="width:100%;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 未送信分をGoogleドライブへ送る</button>
+        <p class="hint">前回送った後の新しい記録だけを1つのファイルにして送ります（追加方式・上書きなし）。ファイル名は「端末番号_誤品照合_日付_時刻.csv」なので、複数台・何回送っても名前が重なりません。オンラインにしてから押し、共有先で「ドライブ」を選んでください。</p>
       </div>
       <div style="max-height:300px;overflow:auto">
         <table><thead><tr><th>時刻</th><th>客先品番</th><th>社内品番</th><th>結果</th></tr></thead>
@@ -175,26 +192,49 @@ h2{font-size:16px;margin:4px 0 10px}
     </div>
 
     <div class="card">
+      <h2>端末番号</h2>
+      <div class="row"><label>この端末の番号</label><input id="cfgDev" inputmode="numeric" maxlength="3" placeholder="例：01"></div>
+      <p class="hint">タブレット・スマホごとに違う番号（01、02、03…）を付けてください。CSVのファイル名の頭と、各記録に入ります。</p>
+    </div>
+
+    <div class="card">
       <h2>解除パスワード（担当者が設定）</h2>
       <div class="row"><label>新しい番号</label><input id="cfgPw" type="password" inputmode="numeric" placeholder="変更しない場合は空欄"></div>
       <p class="hint">NGの解除と、この管理設定画面に入るときだけ使います。作業者には教えない番号にしてください。</p>
     </div>
 
     <div class="card">
-      <h2>音・バイブの確認</h2>
-      <div class="row testRow">
-        <button class="btn" onclick="sound('read')">読取 ピッ</button>
-        <button class="btn" style="background:#16a34a" onclick="sound('ok')">OK ピンポーン</button>
-        <button class="btn red" onclick="sound('ng')">NG ブー</button>
-      </div>
-      <p class="hint">音が出ないときは、端末の音量（メディア音量）とマナーモードを確認してください。</p>
+      <h2>音・バイブ</h2>
+      <div class="row"><label>OKの音</label><select id="cfgOk" onchange="sound('ok',true)"></select><button class="btn" style="background:#16a34a;flex:0" onclick="sound('ok',true)">▶</button></div>
+      <div class="row"><label>NGの音</label><select id="cfgNg" onchange="sound('ng',true)"></select><button class="btn red" style="flex:0" onclick="sound('ng',true)">▶</button></div>
+      <div class="row"><label>1枚目読取の音</label><select id="cfgRd" onchange="sound('read',true)"></select><button class="btn" style="flex:0" onclick="sound('read',true)">▶</button></div>
+      <div class="row"><label>音量</label>
+        <select id="cfgVol" onchange="sound('ok',true)"><option value="0.35">小</option><option value="0.7">中</option><option value="1">大</option></select></div>
+      <div class="row"><label>バイブ</label>
+        <select id="cfgVib"><option value="1">あり</option><option value="0">なし</option></select></div>
+      <p class="hint">▶で試し聞きできます。音が出ないときは、端末のメディア音量とマナーモードを確認してください。</p>
+    </div>
+
+    <div class="card">
+      <h2>照合記録の保存</h2>
+      <div class="row"><label>CSVの保存先</label>
+        <select id="cfgSave">
+          <option value="download">端末の「ダウンロード」フォルダ</option>
+          <option value="share">毎回選ぶ（Googleドライブ・メール・LINEなど）</option>
+        </select></div>
+      <p class="hint">照合記録は日付ごとにすべてタブレット内に残ります。24時になると自動で翌日の記録に切り替わります。</p>
+      <div class="row"><label>日付が変わったら</label>
+        <select id="cfgDayReset">
+          <option value="0">読取済みかんばんはそのまま</option>
+          <option value="1">読取済みかんばんもリセット</option>
+        </select></div>
     </div>
 
     <div class="card">
       <h2>データ管理</h2>
       <div class="row">
         <button class="btn red" onclick="resetEdaban()">読取済みかんばんをリセット</button>
-        <button class="btn red" onclick="resetLog()">履歴を消去</button>
+        <button class="btn red" onclick="resetLog()">全期間の記録を消去</button>
       </div>
       <p class="hint">客先かんばんのQRの中身（全文字）がまったく同じものを「同じかんばん」としてエラーにします。枝番の位置を調べる必要はありません。便や日付が変わってリセットが必要なときに使ってください。</p>
     </div>
@@ -233,7 +273,8 @@ const DEFAULT_CFG = { cPs:1, cPl:150, iPs:1, iPl:150, cmp:'full', pw:'0000', mod
 let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
 if(!(cfg.cPl>0)) cfg.cPl = 150; if(!(cfg.iPl>0)) cfg.iPl = 150;   // 旧設定（0=最後まで）からの移行
 let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
-let logs = LS.get('logs', []);
+let dayLogs = [];                      // 表示中の日付の記録
+let todayStat = {ok:0, ng:0};          // 今日のOK/NG数
 let cur = null;                         // 読取中の客先かんばん
 let locked = false;
 let qr = null, lastCam = '', lastCamAt = 0;
@@ -272,17 +313,46 @@ function tone(freq, start, dur, type, vol){
   o.connect(g); g.connect(actx.destination);
   o.start(t0); o.stop(t0 + dur + 0.02);
 }
-function sound(kind){
+// 選べる音（[周波数, 開始秒, 長さ秒, 波形, 音量]）
+const SOUNDS = {
+  ok: {
+    chime:  ['ピンポーン',     [[1319,0,.18,'sine',.5],[1047,.2,.45,'sine',.5]]],
+    pi:     ['ピッ',           [[2000,0,.12,'sine',.5]]],
+    pipi:   ['ピピッ',         [[2000,0,.08,'sine',.5],[2000,.12,.08,'sine',.5]]],
+    domiso: ['ドミソ↑',        [[1047,0,.12,'sine',.45],[1319,.13,.12,'sine',.45],[1568,.26,.3,'sine',.45]]],
+    kira:   ['キラリン',       [[1568,0,.07,'triangle',.5],[2093,.07,.07,'triangle',.5],[2637,.14,.25,'triangle',.5]]],
+    pon:    ['ポン（低め）',   [[660,0,.25,'sine',.6]]]
+  },
+  ng: {
+    buzz:   ['ブーー',         [[140,0,1.0,'sawtooth',.6],[146,0,1.0,'square',.25]]],
+    bubu:   ['ブッブー',       [[150,0,.25,'sawtooth',.6],[150,.35,.7,'sawtooth',.6]]],
+    siren:  ['ピーポー（警報）',[[960,0,.35,'square',.35],[770,.35,.35,'square',.35],[960,.7,.35,'square',.35],[770,1.05,.35,'square',.35]]],
+    beep3:  ['ビッビッビッ',   [[880,0,.15,'square',.4],[880,.25,.15,'square',.4],[880,.5,.15,'square',.4]]],
+    down:   ['ドミソ↓（失敗音）',[[784,0,.18,'square',.35],[622,.2,.18,'square',.35],[466,.4,.5,'square',.35]]]
+  },
+  read: {
+    pi:     ['ピッ（高）',     [[1800,0,.08,'sine',.4]]],
+    pu:     ['プッ（低）',     [[900,0,.08,'sine',.5]]],
+    none:   ['音なし',         []]
+  }
+};
+const SND_DEFAULT = { ok:'chime', ng:'buzz', read:'pi' };
+function sndPick(kind, preview){
+  const id = {ok:'cfgOk', ng:'cfgNg', read:'cfgRd'}[kind];
+  const v = preview ? document.getElementById(id).value : (cfg['snd_'+kind] || SND_DEFAULT[kind]);
+  return SOUNDS[kind][v] ? SOUNDS[kind][v][1] : SOUNDS[kind][SND_DEFAULT[kind]][1];
+}
+function sound(kind, preview){
   try{
     audioUnlock();
     if(actx){
-      if(kind==='read'){ tone(1800, 0, .08, 'sine', .4); }
-      else if(kind==='ok'){ tone(1319, 0, .18, 'sine', .5); tone(1047, .2, .45, 'sine', .5); }   // ピンポーン
-      else { tone(140, 0, 1.0, 'sawtooth', .6); tone(146, 0, 1.0, 'square', .25); }             // ブーー
+      const vol = Number(preview ? document.getElementById('cfgVol').value : (cfg.vol || 0.7));
+      sndPick(kind, preview).forEach(([f,s,d,w,v]) => tone(f, s, d, w, Math.max(0.001, v*vol*1.4)));
     }
   }catch(e){}
   try{
-    if(navigator.vibrate){
+    const vib = preview ? document.getElementById('cfgVib').value !== '0' : cfg.vib !== '0';
+    if(vib && navigator.vibrate){
       navigator.vibrate(kind==='read' ? 40 : kind==='ok' ? 150 : [600,150,600,150,600]);
     }
   }catch(e){}
@@ -371,29 +441,163 @@ function renderSteps(){
     document.getElementById('guide').textContent = '① 客先かんばんを読み取ってください';
   }
   document.getElementById('s2v').textContent = '－';
-  document.getElementById('cOk').textContent = logs.filter(l=>l.r==='OK').length;
-  document.getElementById('cNg').textContent = logs.filter(l=>l.r!=='OK').length;
+  document.getElementById('cOk').textContent = todayStat.ok;
+  document.getElementById('cNg').textContent = todayStat.ng;
   document.getElementById('cEda').textContent = Object.keys(readC).length;
 }
+function dayKey(d){ d = d || new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+function dayLabel(k){ const [y,m,d] = k.split('-'); const w='日月火水木金土'[new Date(+y,+m-1,+d).getDay()]; return `${y}/${m}/${d}（${w}）`; }
+let today = dayKey(), viewDay = today, dbh = null;
+
+// --- IndexedDB（タブレット内に大量の記録を安全に保存） ---
+function dbOpen(){
+  return new Promise((res, rej)=>{
+    const r = indexedDB.open('gohin', 1);
+    r.onupgradeneeded = () => { const s = r.result.createObjectStore('logs', {keyPath:'id', autoIncrement:true}); s.createIndex('day','day'); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+function dbTx(mode, fn){
+  return new Promise((res, rej)=>{
+    const tx = dbh.transaction('logs', mode), st = tx.objectStore('logs');
+    let out; Promise.resolve(fn(st, v => out = v)).catch(rej);
+    tx.oncomplete = () => res(out); tx.onerror = () => rej(tx.error);
+  });
+}
+const dbAdd  = rec => dbTx('readwrite', st => st.add(rec));
+const dbDay  = day => dbTx('readonly', (st, set) => { const r = st.index('day').getAll(day); r.onsuccess = () => set(r.result); });
+const dbAll  = ()  => dbTx('readonly', (st, set) => { const r = st.getAll(); r.onsuccess = () => set(r.result); });
+const dbClear= ()  => dbTx('readwrite', st => st.clear());
+const dbPut  = rec => dbTx('readwrite', st => st.put(rec));
+function nextNo(){ const n = (LS.get('seq', 0) || 0) + 1; LS.set('seq', n); return n; }   // 消去してもリセットしない通し番号
+const dbDays = ()  => dbTx('readonly', (st, set) => {
+  const out = []; const r = st.index('day').openKeyCursor(null, 'prevunique');
+  r.onsuccess = () => { const c = r.result; if(c){ out.push(c.key); c.continue(); } else set(out); };
+});
+
 function addLog(hin, inner, r, raw){
-  logs.unshift({t:now(), hin, inner, r, raw:raw||''});
-  if(logs.length > 5000) logs.length = 5000;
-  LS.set('logs', logs); renderLog();
+  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo()};
+  if(rec.day !== today) rollDay();
+  if(r==='OK') todayStat.ok++; else todayStat.ng++;
+  if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
+  renderSteps();
+  if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); if(!document.querySelector(`#daySel option[value="${rec.day}"]`)) refreshDays(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
 }
 function renderLog(){
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  document.getElementById('logBody').innerHTML = logs.slice(0,200).map(l =>
-    `<tr><td>${esc(l.t.slice(5))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}</td></tr>`).join('');
+  document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
+    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="hint">この日の記録はありません</td></tr>';
+  const ok = dayLogs.filter(l=>l.r==='OK').length;
+  document.getElementById('daySum').innerHTML =
+    `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.length-ok}</b>件` +
+    (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
 }
-function exportCsv(){
-  const q = s => '"' + String(s).replace(/"/g,'""') + '"';
-  const rows = [['日時','客先品番','社内品番','結果','客先QR全文']].concat(logs.map(l=>[l.t,l.hin,l.inner,l.r,l.raw||'']));
-  const csv = '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
+async function refreshDays(){
+  let days = dbh ? await dbDays() : [];
+  if(!days.includes(today)) days.unshift(today);
+  days.sort().reverse();
+  document.getElementById('daySel').innerHTML = days.map(d => `<option value="${d}" ${d===viewDay?'selected':''}>${dayLabel(d)}${d===today?'　今日':''}</option>`).join('');
+}
+async function changeDay(d){
+  viewDay = d;
+  dayLogs = dbh ? (await dbDay(d)).reverse() : [];
+  renderLog();
+}
+function rollDay(){                     // 24時を過ぎたら翌日の記録へ切り替え
+  const prev = today; today = dayKey();
+  if(prev === today) return;
+  todayStat = {ok:0, ng:0};
+  if(cfg.dayReset === '1'){ readC = {}; LS.set('readC', readC); }
+  if(viewDay === prev){ viewDay = today; dayLogs = []; }
+  refreshDays(); renderLog(); renderSteps(); refreshSendState();
+}
+setInterval(()=>{ if(dayKey() !== today) rollDay(); }, 10000);
+
+async function exportCsv(scope){
+  const list = scope==='all' ? (dbh ? await dbAll() : []) : dayLogs.slice().reverse();
+  if(!list.length){ alert('記録がありません'); return; }
+  if(scope==='all') list.sort((a,b)=> a.t < b.t ? -1 : 1);
+  const csv = csvOf(list);
+  const name = scope==='all' ? `${devTag()}_誤品照合_全期間_${stamp()}.csv` : `${devTag()}_誤品照合_${viewDay.replace(/-/g,'')}_${stamp()}.csv`;
+  const file = new File([csv], name, {type:'text/csv'});
+  if(cfg.saveMode==='share' && navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:name}); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-  const d = new Date();
-  a.download = `誤品照合_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.csv`;
-  a.click();
+  a.href = URL.createObjectURL(file); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------- Googleドライブへの送信（オンライン時にまとめて） ---------- */
+let lastSentNo = LS.get('lastSentNo', 0);   // ここまでの通し番号は送信済み
+function devTag(){ return '端末' + (cfg.dev || '未設定'); }
+function stamp(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? '端末'+cfg.dev : '端末番号未設定'; b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
+async function unsentList(){
+  const all = dbh ? await dbAll() : [];
+  return all.filter(l => (l.no||0) > lastSentNo).sort((a,b)=> a.no - b.no);
+}
+async function refreshSendState(){
+  const un = await unsentList();
+  document.getElementById('unsentTxt').innerHTML = un.length
+    ? `<span style="color:#b45309">未送信 ${un.length}件</span>（通し番号 ${un[0].no}～${un[un.length-1].no}）`
+    : `<span style="color:#16a34a">すべて送信済み</span>${lastSentNo ? `（通し番号 ${lastSentNo} まで）` : ''}`;
+  document.getElementById('bnCnt').textContent = un.length;
+  if(!(navigator.onLine && un.length)) document.getElementById('sendBanner').classList.add('hidden');
+  return {count: un.length};
+}
+function csvOf(list){
+  const q = s => '"' + String(s).replace(/"/g,'""') + '"';
+  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文']]
+    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'']));
+  return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
+}
+
+async function sendToDrive(){
+  if(!cfg.dev){ alert('先に⚙設定で「端末番号」を設定してください（例：01）。\n複数台のファイル名が重ならないようにするためです。'); return; }
+  const list = await unsentList();
+  if(!list.length){ alert('未送信の記録はありません'); return; }
+  if(!navigator.onLine && !confirm('オフラインのようです。このまま続けますか？')) return;
+  const upto = list[list.length-1].no;
+  const name = `${devTag()}_誤品照合_${stamp()}.csv`;
+  const files = [new File([csvOf(list)], name, {type:'text/csv'})];
+  let done = false;
+  if(navigator.canShare && navigator.canShare({files})){
+    try{ await navigator.share({files, title:name}); done = true; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  if(!done){ const a=document.createElement('a'); a.href=URL.createObjectURL(files[0]); a.download=name; a.click(); }
+  if(confirm(`「${name}」（${list.length}件・通し番号 ${list[0].no}～${upto}）をGoogleドライブに保存できましたか？\n「OK」で送信済みにします。`)){
+    lastSentNo = upto; LS.set('lastSentNo', lastSentNo);
+    LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name, from:list[0].no, to:upto, n:list.length}]).slice(-500));
+    refreshSendState();
+  }
+}
+window.addEventListener('online', async ()=>{
+  const {count} = await refreshSendState();
+  if(count) document.getElementById('sendBanner').classList.remove('hidden');
+});
+
+async function initRecords(){
+  try{
+    dbh = await dbOpen();
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+    const old = LS.get('logs', []);       // 旧版の記録を引き継ぐ
+    if(old.length){
+      for(const l of old.slice().reverse()) await dbAdd({day:String(l.t).slice(0,10).replace(/\//g,'-'), t:l.t, hin:l.hin||'', inner:l.inner||'', r:l.r, raw:l.raw||''});
+      LS.set('logs', []);
+    }
+    const noNo = (await dbAll()).filter(l=>!l.no).sort((a,b)=>a.id-b.id);
+    for(const l of noNo){ l.no = nextNo(); l.dev = l.dev || cfg.dev || ''; await dbPut(l); }
+    const t = await dbDay(today);
+    todayStat = {ok:t.filter(l=>l.r==='OK').length, ng:t.filter(l=>l.r!=='OK').length};
+    dayLogs = t.reverse();
+  }catch(e){ alert('記録用の保存領域を開けませんでした：' + e); }
+  await refreshDays(); renderLog(); renderSteps();
+  const {count} = await refreshSendState();
+  if(navigator.onLine && count) document.getElementById('sendBanner').classList.remove('hidden');
 }
 
 /* ---------- 入力（スキャナー／カメラ） ---------- */
@@ -435,7 +639,12 @@ function openSettings(){
   if(locked || !askPw()) return;
   stopCamera();
   const f = (id,v)=>document.getElementById(id).value = v;
-  f('cfgCmp',cfg.cmp); f('cfgPw','');
+  const opts = (id, kind) => document.getElementById(id).innerHTML =
+    Object.entries(SOUNDS[kind]).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join('');
+  opts('cfgOk','ok'); opts('cfgNg','ng'); opts('cfgRd','read');
+  f('cfgOk', cfg.snd_ok||SND_DEFAULT.ok); f('cfgNg', cfg.snd_ng||SND_DEFAULT.ng); f('cfgRd', cfg.snd_read||SND_DEFAULT.read);
+  f('cfgVol', String(cfg.vol||0.7)); f('cfgVib', cfg.vib||'1'); f('cfgSave', cfg.saveMode||'download'); f('cfgDayReset', cfg.dayReset||'0');
+  f('cfgCmp',cfg.cmp); f('cfgPw',''); f('cfgDev', cfg.dev||'');
   document.getElementById('viewMain').classList.add('hidden');
   document.getElementById('viewSettings').classList.remove('hidden');
 }
@@ -447,12 +656,22 @@ function closeSettings(){
 function saveSettings(){
   const g = id => document.getElementById(id).value;
   cfg.cmp=g('cfgCmp');
+  cfg.snd_ok=g('cfgOk'); cfg.snd_ng=g('cfgNg'); cfg.snd_read=g('cfgRd'); cfg.vol=g('cfgVol'); cfg.vib=g('cfgVib');
+  cfg.saveMode=g('cfgSave'); cfg.dayReset=g('cfgDayReset');
+  const dv = g('cfgDev').trim().replace(/[^0-9A-Za-z]/g,'');
+  if(!dv){ alert('端末番号を入力してください（例：01）'); return; }
+  cfg.dev = /^\d$/.test(dv) ? '0'+dv : dv; renderDev();
   const pw = g('cfgPw').trim();
   if(pw){ if(pw.length<4){ alert('番号は4桁以上にしてください'); return; } cfg.pw = pw; }
   LS.set('cfg', cfg); alert('保存しました'); closeSettings();
 }
 function resetEdaban(){ if(confirm('読取済みかんばんの記録をすべて消去します。よろしいですか？')){ readC={}; LS.set('readC',readC); renderSteps(); alert('リセットしました'); } }
-function resetLog(){ if(confirm('照合履歴をすべて消去します。先にCSV出力しましたか？')){ logs=[]; LS.set('logs',logs); renderLog(); renderSteps(); } }
+async function resetLog(){
+  if(!confirm('全期間の照合記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
+  if(!confirm('本当に消去しますか？元に戻せません。')) return;
+  if(dbh) await dbClear();
+  todayStat = {ok:0, ng:0}; dayLogs = []; await refreshDays(); renderLog(); renderSteps();
+}
 
 /* ---------- 抜き取り位置（事前設定・パスワード不要） ---------- */
 let lastRaw = LS.get('lastRaw', {c:'', i:''});
@@ -506,7 +725,7 @@ function startWork(){
   document.getElementById('startCover').classList.add('hidden');
   setMode(cfg.mode);
 }
-renderSteps(); renderLog(); renderPosSummary();
+renderSteps(); renderPosSummary(); renderDev(); initRecords();
 
 /* ---------- オフライン対応 ---------- */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
