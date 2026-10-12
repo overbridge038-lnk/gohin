@@ -69,6 +69,11 @@ h2{font-size:16px;margin:4px 0 10px}
 .ch.inP{background:#2563eb;border-color:#2563eb}.ch.inP .c,.ch.inP .n{color:#fff}
 .ch.inE{background:#ea580c;border-color:#ea580c}.ch.inE .c,.ch.inE .n{color:#fff}
 .ch.pick{outline:3px solid #111827}
+.posGrp{border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-bottom:8px}
+.posTtl{font-weight:700;margin-bottom:4px}
+.posRow{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:15px}
+.posRow button{width:44px;height:44px;font-size:22px;border-radius:10px;border:1px solid #d1d5db;background:#f9fafb}
+.posRow input{width:72px;height:44px;font-size:20px;text-align:center;border:1px solid #d1d5db;border-radius:8px}
 .preview{margin-top:10px;font-size:15px;background:#fffbeb;padding:8px;border-radius:8px}
 </style>
 </head>
@@ -90,27 +95,33 @@ h2{font-size:16px;margin:4px 0 10px}
       <div id="reader" class="hidden"></div>
     </div>
 
-    <!-- 抜き取り位置設定（照合画面上） -->
-    <div class="card setup hidden" id="setupPanel">
-      <h2>✂ 抜き取り位置の設定</h2>
-      <div class="tabs">
-        <button id="tabC" onclick="setupSide('c')">客先かんばん</button>
-        <button id="tabI" onclick="setupSide('i')">社内かんばん</button>
-      </div>
-      <div class="hint" id="setupGuide"></div>
-      <div class="targets" id="targets"></div>
-      <div id="chars" class="chars"></div>
-      <div id="preview" class="preview"></div>
-      <div class="row" style="justify-content:center;margin-top:10px">
-        <button class="btn" onclick="setupSave()">この位置で保存</button>
-        <button class="btn gray" onclick="setupClose()">やめる</button>
+    <!-- 抜き取り位置（作業者が事前に設定・パスワード不要） -->
+    <div class="card" id="posCard" style="padding:10px 14px">
+      <button class="btn gray" style="width:100%" id="posToggle" onclick="togglePos()">✂ 品番の抜き取り位置を設定</button>
+      <h2 id="posTitle" class="hidden" style="margin:0">✂ 品番の抜き取り位置</h2>
+      <div id="posSummary" class="hidden"></div>
+      <div id="posEdit" class="hidden" style="margin-top:8px">
+        <div class="posGrp">
+          <div class="posTtl">客先かんばん</div>
+          <div class="posRow"><span>開始</span><button onclick="stepPos('cS',-1)">－</button><input id="pcS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cS',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>終了</span><button onclick="stepPos('cE',-1)">－</button><input id="pcE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cE',1)">＋</button><span>文字目</span></div>
+          <div class="hint" id="pvC"></div>
+        </div>
+        <div class="posGrp">
+          <div class="posTtl">社内かんばん</div>
+          <div class="posRow"><span>開始</span><button onclick="stepPos('iS',-1)">－</button><input id="piS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iS',1)">＋</button><span>文字目</span></div>
+          <div class="posRow"><span>終了</span><button onclick="stepPos('iE',-1)">－</button><input id="piE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iE',1)">＋</button><span>文字目</span></div>
+          <div class="hint" id="pvI"></div>
+        </div>
+        <p class="hint">1～150文字目の範囲で設定できます。下の確認は、最後に読み取ったかんばんで表示しています。</p>
+        <div class="row" style="justify-content:center">
+          <button class="btn" onclick="savePos()">この位置で保存</button>
+          <button class="btn gray" onclick="togglePos(false)">やめる</button>
+        </div>
       </div>
     </div>
 
     <div class="card" id="judgeCard">
-      <div class="row" style="justify-content:flex-end;margin:0 0 4px">
-        <button class="btn gray" style="padding:6px 10px;font-size:13px" onclick="setupOpen()">✂ 抜き取り位置を設定</button>
-      </div>
       <div class="guide" id="guide">① 客先かんばんを読み取ってください</div>
       <div class="steps">
         <div class="step active" id="s1">
@@ -153,27 +164,6 @@ h2{font-size:16px;margin:4px 0 10px}
   <!-- 設定画面 -->
   <section id="viewSettings" class="hidden">
     <div class="card">
-      <h2>読み取りテスト（位置の確認）</h2>
-      <p class="hint">かんばんのQRを読み取ると、何文字目に何が入っているかを表示します。下の「抜き取り位置」を決めるのに使ってください。</p>
-      <input id="testInput" placeholder="ここにQRを読み取り" style="width:100%;font-size:16px;padding:10px;border:1px solid #d1d5db;border-radius:8px">
-      <div id="ruler" style="margin-top:8px">（まだ読み取っていません）</div>
-      <div id="testResult" class="hint" style="margin-top:6px"></div>
-    </div>
-
-    <div class="card">
-      <h2>客先かんばん 抜き取り位置</h2>
-      <div class="row"><label>品番 開始位置</label><input id="cfgCPs" type="number" min="1"></div>
-      <div class="row"><label>品番 桁数</label><input id="cfgCPl" type="number" min="0"></div>
-      <p class="hint">桁数を 0 にすると、開始位置から最後までを使います。</p>
-    </div>
-
-    <div class="card">
-      <h2>社内かんばん 抜き取り位置</h2>
-      <div class="row"><label>品番 開始位置</label><input id="cfgIPs" type="number" min="1"></div>
-      <div class="row"><label>品番 桁数</label><input id="cfgIPl" type="number" min="0"></div>
-    </div>
-
-    <div class="card">
       <h2>照合ルール</h2>
       <div class="row"><label>品番の比較</label>
         <select id="cfgCmp">
@@ -187,7 +177,7 @@ h2{font-size:16px;margin:4px 0 10px}
     <div class="card">
       <h2>解除パスワード（担当者が設定）</h2>
       <div class="row"><label>新しい番号</label><input id="cfgPw" type="password" inputmode="numeric" placeholder="変更しない場合は空欄"></div>
-      <p class="hint">エラー解除・設定画面・読取済みリセットに使います。作業者には教えない番号にしてください。</p>
+      <p class="hint">NGの解除と、この管理設定画面に入るときだけ使います。作業者には教えない番号にしてください。</p>
     </div>
 
     <div class="card">
@@ -239,8 +229,9 @@ const LS = {
   get(k, d){ try{ const v = localStorage.getItem('gohin_'+k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
   set(k, v){ try{ localStorage.setItem('gohin_'+k, JSON.stringify(v)); }catch(e){} }
 };
-const DEFAULT_CFG = { cPs:1, cPl:0, cEs:1, cEl:0, iPs:1, iPl:0, cmp:'full', pw:'0000', mode:'scanner' };
+const DEFAULT_CFG = { cPs:1, cPl:150, iPs:1, iPl:150, cmp:'full', pw:'0000', mode:'scanner' };
 let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
+if(!(cfg.cPl>0)) cfg.cPl = 150; if(!(cfg.iPl>0)) cfg.iPl = 150;   // 旧設定（0=最後まで）からの移行
 let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
 let logs = LS.get('logs', []);
 let cur = null;                         // 読取中の客先かんばん
@@ -302,7 +293,6 @@ function beep(ok){ sound(ok ? 'ok' : 'ng'); }
 function onScan(raw){
   raw = String(raw||'').replace(/[\r\n]+$/,'');
   if(!raw || locked) return;
-  if(setup){ setupRead(raw); return; }
   if(!cur){
     // ① 客先かんばん
     const hin = cut(raw, cfg.cPs, cfg.cPl);
@@ -311,12 +301,12 @@ function onScan(raw){
     if(readC[key]){
       return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${readC[key]}`, {hin, inner:'', kind:'かんばん重複'});
     }
-    cur = { raw, hin, key };
+    cur = { raw, hin, key }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
     renderSteps();
     sound('read');
   }else{
     // ② 社内かんばん
-    const ihin = cut(raw, cfg.iPs, cfg.iPl);
+    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
     const a = norm(cur.hin), b = norm(ihin);
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     if(match){
@@ -445,11 +435,9 @@ function openSettings(){
   if(locked || !askPw()) return;
   stopCamera();
   const f = (id,v)=>document.getElementById(id).value = v;
-  f('cfgCPs',cfg.cPs); f('cfgCPl',cfg.cPl);
-  f('cfgIPs',cfg.iPs); f('cfgIPl',cfg.iPl); f('cfgCmp',cfg.cmp); f('cfgPw','');
+  f('cfgCmp',cfg.cmp); f('cfgPw','');
   document.getElementById('viewMain').classList.add('hidden');
   document.getElementById('viewSettings').classList.remove('hidden');
-  document.getElementById('testInput').focus();
 }
 function closeSettings(){
   document.getElementById('viewSettings').classList.add('hidden');
@@ -458,8 +446,7 @@ function closeSettings(){
 }
 function saveSettings(){
   const g = id => document.getElementById(id).value;
-  cfg.cPs=+g('cfgCPs')||1; cfg.cPl=+g('cfgCPl')||0;
-  cfg.iPs=+g('cfgIPs')||1; cfg.iPl=+g('cfgIPl')||0; cfg.cmp=g('cfgCmp');
+  cfg.cmp=g('cfgCmp');
   const pw = g('cfgPw').trim();
   if(pw){ if(pw.length<4){ alert('番号は4桁以上にしてください'); return; } cfg.pw = pw; }
   LS.set('cfg', cfg); alert('保存しました'); closeSettings();
@@ -467,107 +454,50 @@ function saveSettings(){
 function resetEdaban(){ if(confirm('読取済みかんばんの記録をすべて消去します。よろしいですか？')){ readC={}; LS.set('readC',readC); renderSteps(); alert('リセットしました'); } }
 function resetLog(){ if(confirm('照合履歴をすべて消去します。先にCSV出力しましたか？')){ logs=[]; LS.set('logs',logs); renderLog(); renderSteps(); } }
 
-// 読み取りテスト：位置ルーラー表示
-document.getElementById('testInput').addEventListener('keydown', e=>{
-  if(e.key!=='Enter') return;
-  e.preventDefault();
-  const raw = e.target.value; e.target.value='';
-  const chars = [...raw];
-  let lines = [];
-  for(let i=0;i<chars.length;i+=10){
-    const seg = chars.slice(i,i+10);
-    lines.push(String(i+1).padStart(3,' ') + '～: ' + seg.map(c=>c===' '?'␣':c).join(' '));
-  }
-  document.getElementById('ruler').textContent = `全${chars.length}文字\n` + lines.join('\n');
-  const g = id => document.getElementById(id).value;
-  document.getElementById('testResult').textContent =
-    `今の設定で抜き取ると → 客先品番「${cut(raw,g('cfgCPs'),g('cfgCPl'))}」 ／ 社内品番「${cut(raw,g('cfgIPs'),g('cfgIPl'))}」`;
-});
-
-/* ---------- 照合画面上での抜き取り位置設定 ---------- */
-// sel: [開始位置(1始まり), 終了位置] / null
-let setup = null;
-function rangeOf(s, l, raw){ const st = Number(s)||1; const en = (Number(l)||0) > 0 ? st + Number(l) - 1 : Math.max(st, [...raw].length); return [st, en]; }
-function setupOpen(){
-  if(locked || !askPw()) return;
-  cur = null; renderSteps();
-  const c = cfg.sampleC || '', i = cfg.sampleI || '';
-  setup = {
-    side:'c', target:'P', pick:null,
-    raw:{c, i},
-    sel:{
-      cP: c ? rangeOf(cfg.cPs, cfg.cPl, c) : null,
-      iP: i ? rangeOf(cfg.iPs, cfg.iPl, i) : null
-    }
+/* ---------- 抜き取り位置（事前設定・パスワード不要） ---------- */
+let lastRaw = LS.get('lastRaw', {c:'', i:''});
+const clampPos = v => Math.min(150, Math.max(1, Math.round(Number(v)||1)));
+function posFromCfg(){ return { cS:cfg.cPs, cE:cfg.cPs+cfg.cPl-1, iS:cfg.iPs, iE:cfg.iPs+cfg.iPl-1 }; }
+function renderPosSummary(){
+  const p = posFromCfg();
+  document.getElementById('posSummary').innerHTML =
+    `客先：<b>${p.cS}～${Math.min(150,p.cE)}</b>文字目　／　社内：<b>${p.iS}～${Math.min(150,p.iE)}</b>文字目`;
+}
+function togglePos(open){
+  const ed = document.getElementById('posEdit');
+  const show = open===undefined ? ed.classList.contains('hidden') : open;
+  ed.classList.toggle('hidden', !show);
+  document.getElementById('posToggle').classList.toggle('hidden', show);
+  document.getElementById('posTitle').classList.toggle('hidden', !show);
+  if(show){
+    const p = posFromCfg();
+    ['cS','cE','iS','iE'].forEach(k=>document.getElementById('p'+k).value = clampPos(p[k]));
+    previewPos();
+  }else focusInput();
+}
+function stepPos(k, d){
+  const el = document.getElementById('p'+k);
+  el.value = clampPos((Number(el.value)||1) + d); previewPos();
+}
+function previewPos(){
+  LS.set('lastRaw', lastRaw);
+  const v = k => clampPos(document.getElementById('p'+k).value);
+  const show = (raw, s, e, id) => {
+    const el = document.getElementById(id);
+    if(e < s){ el.innerHTML = '<span style="color:#dc2626">終了は開始以上にしてください</span>'; return; }
+    el.textContent = raw ? `直近の読取 → 「${[...raw].slice(s-1, e).join('')}」` : '（まだ読み取りがありません）';
   };
-  document.getElementById('setupPanel').classList.remove('hidden');
-  document.getElementById('judgeCard').classList.add('hidden');
-  renderSetup(); focusInput();
+  show(lastRaw.c, v('cS'), v('cE'), 'pvC');
+  show(lastRaw.i, v('iS'), v('iE'), 'pvI');
 }
-function setupClose(){
-  setup = null;
-  document.getElementById('setupPanel').classList.add('hidden');
-  document.getElementById('judgeCard').classList.remove('hidden');
-  focusInput();
-}
-function setupSide(s){ setup.side = s; setup.target = 'P'; setup.pick = null; renderSetup(); focusInput(); }
-function setupTarget(t){ setup.target = t; setup.pick = null; renderSetup(); }
-function setupRead(raw){
-  setup.raw[setup.side] = raw;
-  if(setup.side==='c'){ setup.sel.cP = null; } else { setup.sel.iP = null; }
-  setup.target = 'P'; setup.pick = null;
-  sound('read'); renderSetup();
-}
-function tapChar(pos){
-  const key = setup.side + setup.target;
-  if(setup.pick===null){
-    setup.pick = pos; setup.sel[key] = [pos, pos];          // 1回目：開始位置
-  }else{
-    const a = Math.min(setup.pick, pos), b = Math.max(setup.pick, pos);
-    setup.sel[key] = [a, b]; setup.pick = null;            // 2回目：終了位置
-  }
-  renderSetup();
-}
-function renderSetup(){
-  const s = setup, raw = s.raw[s.side], chars = [...raw];
-  document.getElementById('tabC').classList.toggle('on', s.side==='c');
-  document.getElementById('tabI').classList.toggle('on', s.side==='i');
-  const tg = document.getElementById('targets');
-  tg.innerHTML = `<button class="tP on">品番</button>`;
-  const name = s.side==='c' ? '客先かんばん' : '社内かんばん';
-  const tName = '品番';
-  document.getElementById('setupGuide').textContent = !raw
-    ? `${name}のQRを読み取ってください。`
-    : (s.pick===null ? `${tName}の【最初の文字】をタップ` : `${tName}の【最後の文字】をタップ`) + '（読み直すと別のQRに切り替わります）';
-  const P = s.sel[s.side+'P'], E = null;
-  document.getElementById('chars').innerHTML = chars.map((c,idx)=>{
-    const p = idx+1;
-    let cls = 'ch';
-    if(P && p>=P[0] && p<=P[1]) cls += ' inP';
-    else if(E && p>=E[0] && p<=E[1]) cls += ' inE';
-    if(s.pick===p) cls += ' pick';
-    const show = c===' ' ? '␣' : c.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
-    return `<div class="${cls}" onclick="tapChar(${p})"><div class="n">${p}</div><div class="c">${show}</div></div>`;
-  }).join('');
-  const part = (r, rg) => rg ? chars.slice(rg[0]-1, rg[1]).join('') : '（未設定）';
-  const rc = [...s.raw.c], ri = [...s.raw.i];
-  const pc = (rg, arr) => rg ? arr.slice(rg[0]-1, rg[1]).join('') + `　[${rg[0]}～${rg[1]}文字目]` : '（未設定）';
-  document.getElementById('preview').innerHTML =
-    `客先 品番：<b>${pc(s.sel.cP, rc)}</b><br>社内 品番：<b>${pc(s.sel.iP, ri)}</b>` +
-    (s.sel.cP && s.sel.iP ? `<br>比較（ハイフン除去後）：${norm(pc(s.sel.cP,rc).split('　')[0])===norm(pc(s.sel.iP,ri).split('　')[0]) ? '<span style="color:#16a34a;font-weight:700">一致</span>' : '<span style="color:#dc2626;font-weight:700">不一致</span>'}` : '');
-}
-function setupSave(){
-  const s = setup.sel;
-  const miss = [];
-  if(!s.cP) miss.push('客先 品番'); if(!s.iP) miss.push('社内 品番');
-  if(miss.length && !confirm(miss.join('・') + ' が未設定です（未設定の項目は今の設定のまま）。保存しますか？')) return;
-  if(s.cP){ cfg.cPs = s.cP[0]; cfg.cPl = s.cP[1]-s.cP[0]+1; }
-  if(s.iP){ cfg.iPs = s.iP[0]; cfg.iPl = s.iP[1]-s.iP[0]+1; }
-  if(setup.raw.c) cfg.sampleC = setup.raw.c;
-  if(setup.raw.i) cfg.sampleI = setup.raw.i;
+function savePos(){
+  const v = k => clampPos(document.getElementById('p'+k).value);
+  if(v('cE') < v('cS') || v('iE') < v('iS')){ alert('終了位置は開始位置以上にしてください'); return; }
+  cfg.cPs = v('cS'); cfg.cPl = v('cE') - v('cS') + 1;
+  cfg.iPs = v('iS'); cfg.iPl = v('iE') - v('iS') + 1;
   LS.set('cfg', cfg);
-  alert('抜き取り位置を保存しました');
-  setupClose();
+  cur = null; renderSteps(); renderPosSummary(); togglePos(false);
+  sound('read');
 }
 
 /* ---------- 起動 ---------- */
@@ -576,7 +506,7 @@ function startWork(){
   document.getElementById('startCover').classList.add('hidden');
   setMode(cfg.mode);
 }
-renderSteps(); renderLog();
+renderSteps(); renderLog(); renderPosSummary();
 </script>
 </body>
 </html>
