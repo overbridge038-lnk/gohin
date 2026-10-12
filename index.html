@@ -514,20 +514,40 @@ function rollDay(){                     // 24時を過ぎたら翌日の記録�
 }
 setInterval(()=>{ if(dayKey() !== today) rollDay(); }, 10000);
 
+/* OK／NG を選ぶ確認画面（buttons=false で「閉じる」だけのお知らせ） */
+function askOkNg(title, body, buttons=true){
+  return new Promise(resolve=>{
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+    const btn = 'flex:1;font-size:22px;font-weight:700;padding:18px 0;border:none;border-radius:12px;color:#fff';
+    ov.innerHTML = `<div style="background:#fff;color:#1b1f24;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3)">
+      <div style="font-size:20px;font-weight:700;margin-bottom:10px">${title}</div>
+      <div style="font-size:15px;line-height:1.6;margin-bottom:20px;word-break:break-all">${body}</div>
+      <div style="display:flex;gap:12px">${buttons
+        ? `<button data-v="1" style="${btn};background:#16a34a">OK</button><button data-v="0" style="${btn};background:#dc2626">NG</button>`
+        : `<button data-v="1" style="${btn};background:#2563eb">閉じる</button>`}</div></div>`;
+    ov.addEventListener('click', e=>{ const v = e.target.dataset && e.target.dataset.v; if(v!==undefined){ ov.remove(); resolve(v==='1'); } });
+    document.body.appendChild(ov);
+  });
+}
+
 async function exportCsv(scope){
   const list = scope==='all' ? (dbh ? await dbAll() : []) : dayLogs.slice().reverse();
-  if(!list.length){ alert('記録がありません'); return; }
+  if(!list.length){ await askOkNg('記録がありません', 'CSVにする照合記録がありません。', false); return; }
   if(scope==='all') list.sort((a,b)=> a.t < b.t ? -1 : 1);
+  const what = scope==='all' ? '全期間' : viewDay.replace(/-/g,'/');
+  if(!await askOkNg(`${what}のCSVを保存しますか？`, `${list.length}件の記録を保存します。<br>保存する → <b style="color:#16a34a">OK</b>　やめる → <b style="color:#dc2626">NG</b>`)) return;
   const csv = csvOf(list);
   const name = scope==='all' ? `${devTag()}_誤品照合_全期間_${stamp()}.csv` : `${devTag()}_誤品照合_${viewDay.replace(/-/g,'')}_${stamp()}.csv`;
   const file = new File([csv], name, {type:'text/csv'});
   if(cfg.saveMode==='share' && navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:name}); return; }
-    catch(e){ if(e && e.name==='AbortError') return; }
+    try{ await navigator.share({files:[file], title:name}); await askOkNg('保存しました', name, false); return; }
+    catch(e){ if(e && e.name==='AbortError'){ await askOkNg('保存を中止しました', '共有先を選ばずに閉じたため、保存されていません。', false); return; } }
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(file); a.download = name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  await askOkNg('保存しました', `${name}<br><span style="color:#5b6470">スマホの「ダウンロード」フォルダに入っています。</span>`, false);
 }
 
 /* ---------- Googleドライブへの送信（オンライン時にまとめて） ---------- */
