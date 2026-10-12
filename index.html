@@ -79,7 +79,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合</h1>
+  <h1>誤品照合 <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -413,7 +413,7 @@ function setMode(m){
   if(m==='camera') startCamera(); else { stopCamera(); focusInput(); }
 }
 function startCamera(){
-  if(typeof Html5Qrcode==='undefined'){ alert('カメラ機能を読み込めませんでした。ネット接続を確認してください。'); return; }
+  if(typeof Html5Qrcode==='undefined'){ alert('カメラ機能を読み込めませんでした。一度ネットにつながった状態でこのページを開くと、以後はオフラインでも使えます。ハンディスキャナーはそのまま使えます。'); return; }
   if(qr) return;
   qr = new Html5Qrcode('reader');
   qr.start({facingMode:'environment'}, {fps:10, qrbox:{width:250,height:250}}, text=>{
@@ -507,6 +507,11 @@ function startWork(){
   setMode(cfg.mode);
 }
 renderSteps(); renderLog(); renderPosSummary();
+
+/* ---------- オフライン対応 ---------- */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+function netState(){ document.getElementById('netBadge').classList.toggle('hidden', navigator.onLine); }
+window.addEventListener('online', netState); window.addEventListener('offline', netState); netState();
 </script>
 </body>
 </html>
