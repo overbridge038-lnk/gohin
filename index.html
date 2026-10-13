@@ -98,7 +98,8 @@ h2{font-size:16px;margin:4px 0 10px}
         <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
         <button id="mCamera" onclick="setMode('camera')">カメラ</button>
       </div>
-      <input id="scanInput" placeholder="ここにスキャナーで読み取り（半角英数固定）" autocomplete="off" readonly inputmode="none" spellcheck="false">
+      <input id="scanInput" type="password" name="scan-field" placeholder="ここにスキャナーで読み取り（半角英数固定）" autocomplete="off" autocapitalize="off" autocorrect="off" inputmode="none" spellcheck="false" data-lpignore="true">
+      <div id="scanShow" style="margin-top:6px;min-height:22px;font-family:monospace;font-size:15px;color:#4b5563;word-break:break-all"></div>
       <div id="imeWarn" class="hidden" style="margin-top:8px;padding:10px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;font-size:15px"></div>
       <div id="reader" class="hidden"></div>
     </div>
@@ -623,11 +624,33 @@ async function initRecords(){
 
 /* ---------- 入力（スキャナー／カメラ） ---------- */
 const inp = document.getElementById('scanInput');
-/* スキャナー入力は半角英数で固定する。
-   読取欄は「書き込み不可」にしてあるので、タブレットの日本語入力（かな入力）は働かない。
-   スキャナーから届いたキーを1文字ずつ直接受け取り、Enterで1件として確定する。 */
-let scanBuf = '', scanLast = 0, scanTimer = null, imeSeen = false;
+/* スキャナー入力は半角英数で固定する（2段構え）。
+   ① 読取欄は「パスワード欄」。Androidのキーボードはパスワード欄ではかな変換をしないので、
+      タブレットが日本語入力（かな入力）のままでも半角英数がそのまま入る。
+   ② さらに、押されたキーの「位置」（KeyA、Digit1など）からも文字を組み立てておく。
+      日本語入力がキーを横取りしても、こちらで正しい半角英数を復元できる。
+   Enter（または入力が0.4秒止まる）で1件として確定する。 */
+let codeBuf = '', scanLast = 0, scanTimer = null;
 function scanTarget(){ const a = document.activeElement; return !a || a===document.body || a===inp; }
+const CODE_MAP = {
+  Digit1:['1','!'],Digit2:['2','@'],Digit3:['3','#'],Digit4:['4','$'],Digit5:['5','%'],
+  Digit6:['6','^'],Digit7:['7','&'],Digit8:['8','*'],Digit9:['9','('],Digit0:['0',')'],
+  Minus:['-','_'],Equal:['=','+'],BracketLeft:['[','{'],BracketRight:[']','}'],Backslash:['\\','|'],
+  IntlYen:['\\','|'],IntlRo:['\\','_'],Semicolon:[';',':'],Quote:["'",'"'],Comma:[',','<'],
+  Period:['.','>'],Slash:['/','?'],Backquote:['`','~'],Space:[' ',' '],
+  Numpad0:['0','0'],Numpad1:['1','1'],Numpad2:['2','2'],Numpad3:['3','3'],Numpad4:['4','4'],
+  Numpad5:['5','5'],Numpad6:['6','6'],Numpad7:['7','7'],Numpad8:['8','8'],Numpad9:['9','9'],
+  NumpadDecimal:['.','.'],NumpadSubtract:['-','-'],NumpadAdd:['+','+'],NumpadMultiply:['*','*'],NumpadDivide:['/','/']
+};
+function charFromCode(e){
+  const c = e.code || '';
+  if(/^Key[A-Z]$/.test(c)){
+    const up = e.shiftKey !== (e.getModifierState && e.getModifierState('CapsLock'));
+    return up ? c[3] : c[3].toLowerCase();
+  }
+  const m = CODE_MAP[c]; return m ? m[e.shiftKey ? 1 : 0] : '';
+}
+function isAscii(s){ return /^[\x20-\x7E]*$/.test(s); }
 function toHalf(s){
   return String(s)
     .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0))  // 全角英数・記号 → 半角
@@ -640,31 +663,36 @@ function imeWarn(msg){
 }
 function scanFlush(){
   clearTimeout(scanTimer);
-  const v = toHalf(scanBuf); scanBuf = ''; inp.value = '';
-  if(imeSeen){ imeSeen = false; imeWarn('日本語入力（かな入力）の影響で正しく読めませんでした。もう一度読み取ってください。続く場合はキーボードを「英語」に切り替えてください。'); return; }
-  if(/[぀-ヿ]/.test(v)){ imeWarn('かな文字が入りました。もう一度読み取ってください。続く場合はキーボードを「英語」に切り替えてください。'); return; }
-  imeWarn('');
-  if(v.trim()) onScan(v);
-}
-document.addEventListener('keydown', e=>{
-  if(cfg.mode!=='scanner' || !scanTarget()) return;
-  if(e.key==='Enter'){ e.preventDefault(); if(scanBuf || imeSeen) scanFlush(); return; }
-  if(e.key==='Process' || e.key==='Unidentified' || e.isComposing){
-    e.preventDefault();
-    const t = performance.now(); if(t - scanLast > 500) scanBuf = '';
-    scanLast = t; imeSeen = true;
-    clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400);
+  const fromField = toHalf(inp.value), fromCode = codeBuf;
+  inp.value = ''; codeBuf = ''; showScan('');
+  // 読取欄の文字が半角英数ならそれを使う。かなが混ざった・空のときは、キー位置から組み立てた文字を使う
+  const okF = fromField.trim() && isAscii(fromField), okC = fromCode.trim() && isAscii(fromCode);
+  let v = '';
+  if(okF && okC) v = fromCode.length > fromField.length ? fromCode : fromField;   // 取りこぼしの少ない方
+  else if(okF) v = fromField;
+  else if(okC) v = fromCode;
+  if(!v){
+    if(fromField || fromCode) imeWarn('正しく読み取れませんでした。もう一度読み取ってください。');
     return;
   }
-  if(e.key==='Tab'){ e.preventDefault(); return; }
+  imeWarn('');
+  onScan(v);
+}
+function showScan(s){ const d = document.getElementById('scanShow'); if(d) d.textContent = s; }
+function armFlush(){ clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400); }   // Enterが付かない設定でも確定する
+document.addEventListener('keydown', e=>{
+  if(cfg.mode!=='scanner' || !scanTarget()) return;
+  if(e.key==='Enter' || e.code==='Enter' || e.code==='NumpadEnter'){ e.preventDefault(); if(inp.value || codeBuf) scanFlush(); return; }
+  if(e.key==='Tab' || e.code==='Tab'){ e.preventDefault(); return; }
   if(e.ctrlKey || e.altKey || e.metaKey) return;
-  if(e.key && e.key.length===1){
-    e.preventDefault();
-    const t = performance.now(); if(t - scanLast > 500){ scanBuf = ''; imeSeen = false; }
-    scanLast = t; scanBuf += e.key; inp.value = scanBuf;
-    clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400);   // Enterが付かない設定でも確定する
-  }
+  const t = performance.now(); if(t - scanLast > 500){ codeBuf = ''; if(document.activeElement!==inp) inp.value = ''; }
+  scanLast = t;
+  let ch = charFromCode(e);
+  if(!ch && e.key && e.key.length===1) ch = toHalf(e.key);
+  if(ch){ codeBuf += ch; showScan(codeBuf); armFlush(); }
+  if(document.activeElement!==inp){ focusInput(); }        // 読取欄から外れていたら戻す（キー位置の記録で取りこぼしなし）
 });
+inp.addEventListener('input', ()=>{ scanLast = performance.now(); armFlush(); });
 function focusInput(){ if(cfg.mode==='scanner' && !locked && !document.getElementById('viewMain').classList.contains('hidden')) inp.focus(); }
 document.addEventListener('click', e=>{ if(!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) focusInput(); });
 
