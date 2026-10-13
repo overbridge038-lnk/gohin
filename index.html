@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>誤品照合 gohin</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 <style>
 :root{--ok:#16a34a;--ng:#dc2626;--bg:#f3f4f6;--card:#fff;--tx:#111827;--sub:#6b7280;--pri:#2563eb;}
 *{box-sizing:border-box}
@@ -98,7 +98,8 @@ h2{font-size:16px;margin:4px 0 10px}
         <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
         <button id="mCamera" onclick="setMode('camera')">カメラ</button>
       </div>
-      <input id="scanInput" placeholder="ここにスキャナーで読み取り" autocomplete="off">
+      <input id="scanInput" placeholder="ここにスキャナーで読み取り（半角英数固定）" autocomplete="off" readonly inputmode="none" spellcheck="false">
+      <div id="imeWarn" class="hidden" style="margin-top:8px;padding:10px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;font-size:15px"></div>
       <div id="reader" class="hidden"></div>
     </div>
 
@@ -622,8 +623,47 @@ async function initRecords(){
 
 /* ---------- 入力（スキャナー／カメラ） ---------- */
 const inp = document.getElementById('scanInput');
-inp.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); const v = inp.value; inp.value=''; onScan(v); }
+/* スキャナー入力は半角英数で固定する。
+   読取欄は「書き込み不可」にしてあるので、タブレットの日本語入力（かな入力）は働かない。
+   スキャナーから届いたキーを1文字ずつ直接受け取り、Enterで1件として確定する。 */
+let scanBuf = '', scanLast = 0, scanTimer = null, imeSeen = false;
+function scanTarget(){ const a = document.activeElement; return !a || a===document.body || a===inp; }
+function toHalf(s){
+  return String(s)
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0))  // 全角英数・記号 → 半角
+    .replace(/　/g, ' ');                                                          // 全角スペース → 半角
+}
+function imeWarn(msg){
+  const w = document.getElementById('imeWarn');
+  if(!msg){ w.classList.add('hidden'); return; }
+  w.textContent = msg; w.classList.remove('hidden');
+}
+function scanFlush(){
+  clearTimeout(scanTimer);
+  const v = toHalf(scanBuf); scanBuf = ''; inp.value = '';
+  if(imeSeen){ imeSeen = false; imeWarn('日本語入力（かな入力）の影響で正しく読めませんでした。もう一度読み取ってください。続く場合はキーボードを「英語」に切り替えてください。'); return; }
+  if(/[぀-ヿ]/.test(v)){ imeWarn('かな文字が入りました。もう一度読み取ってください。続く場合はキーボードを「英語」に切り替えてください。'); return; }
+  imeWarn('');
+  if(v.trim()) onScan(v);
+}
+document.addEventListener('keydown', e=>{
+  if(cfg.mode!=='scanner' || !scanTarget()) return;
+  if(e.key==='Enter'){ e.preventDefault(); if(scanBuf || imeSeen) scanFlush(); return; }
+  if(e.key==='Process' || e.key==='Unidentified' || e.isComposing){
+    e.preventDefault();
+    const t = performance.now(); if(t - scanLast > 500) scanBuf = '';
+    scanLast = t; imeSeen = true;
+    clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400);
+    return;
+  }
+  if(e.key==='Tab'){ e.preventDefault(); return; }
+  if(e.ctrlKey || e.altKey || e.metaKey) return;
+  if(e.key && e.key.length===1){
+    e.preventDefault();
+    const t = performance.now(); if(t - scanLast > 500){ scanBuf = ''; imeSeen = false; }
+    scanLast = t; scanBuf += e.key; inp.value = scanBuf;
+    clearTimeout(scanTimer); scanTimer = setTimeout(scanFlush, 400);   // Enterが付かない設定でも確定する
+  }
 });
 function focusInput(){ if(cfg.mode==='scanner' && !locked && !document.getElementById('viewMain').classList.contains('hidden')) inp.focus(); }
 document.addEventListener('click', e=>{ if(!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) focusInput(); });
