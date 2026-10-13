@@ -1,756 +1,632 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>誤品照合 gohin</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<style>
-:root{--ok:#16a34a;--ng:#dc2626;--bg:#f3f4f6;--card:#fff;--tx:#111827;--sub:#6b7280;--pri:#2563eb;}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--tx)}
-header{background:#1f2937;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
-header h1{font-size:18px;margin:0}
-header button{background:#374151;color:#fff;border:0;padding:8px 12px;border-radius:8px;font-size:14px}
-main{padding:12px;max-width:720px;margin:0 auto}
-.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.steps{display:flex;gap:8px}
-.step{flex:1;border:3px solid #d1d5db;border-radius:12px;padding:10px;text-align:center}
-.step.active{border-color:var(--pri);background:#eff6ff}
-.step.done{border-color:var(--ok);background:#f0fdf4}
-.step .lbl{font-size:13px;color:var(--sub)}
-.step .val{font-size:20px;font-weight:700;word-break:break-all;min-height:28px}
-.step .sub{font-size:13px;color:var(--sub)}
-.guide{font-size:22px;font-weight:700;text-align:center;margin:12px 0}
-#scanInput{width:100%;font-size:18px;padding:12px;border:2px solid var(--pri);border-radius:10px}
-.modes{display:flex;gap:8px;margin-bottom:10px}
-.modes button{flex:1;padding:10px;border-radius:10px;border:2px solid #d1d5db;background:#fff;font-size:15px}
-.modes button.on{border-color:var(--pri);background:var(--pri);color:#fff}
-#reader{width:100%;margin-top:8px}
-.result{font-size:40px;font-weight:900;text-align:center;padding:16px;border-radius:12px;display:none}
-.result.ok{display:block;background:var(--ok);color:#fff}
-.counts{display:flex;justify-content:space-around;text-align:center;font-size:14px;color:var(--sub)}
-.counts b{display:block;font-size:24px;color:var(--tx)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{border-bottom:1px solid #e5e7eb;padding:6px 4px;text-align:left}
-td.ng{color:var(--ng);font-weight:700}td.ok{color:var(--ok);font-weight:700}
-.btn{padding:10px 14px;border-radius:10px;border:0;background:var(--pri);color:#fff;font-size:15px}
-.btn.gray{background:#6b7280}.btn.red{background:var(--ng)}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
-.row label{min-width:120px;font-size:14px}
-.row input,.row select{flex:1;min-width:80px;padding:8px;font-size:16px;border:1px solid #d1d5db;border-radius:8px}
-h2{font-size:16px;margin:4px 0 10px}
-.hint{font-size:12px;color:var(--sub)}
-#ruler{font-family:monospace;font-size:14px;white-space:pre;overflow-x:auto;background:#f9fafb;padding:8px;border-radius:8px}
-/* ロック画面 */
-#lock{position:fixed;inset:0;background:var(--ng);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;text-align:center}
-#lock.show{display:flex;animation:blink 1s infinite}
-@keyframes blink{50%{background:#991b1b}}
-#lock h2{font-size:44px;margin:0 0 10px}
-#lock .msg{font-size:20px;margin-bottom:6px;word-break:break-all}
-#lock input{font-size:28px;padding:10px;width:220px;text-align:center;border-radius:10px;border:0;margin:14px 0 8px}
-#lock button{font-size:20px;padding:12px 30px;border-radius:10px;border:0;background:#fff;color:var(--ng);font-weight:700}
-#lockErr{min-height:24px;font-size:16px}
-.hidden{display:none!important}
-#startCover{position:fixed;inset:0;background:#1f2937;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;text-align:center}
-.testRow button{flex:1}
-.setup{border:3px solid #f59e0b}
-.tabs{display:flex;gap:6px;margin-bottom:8px}
-.tabs button{flex:1;padding:10px;border-radius:10px;border:2px solid #d1d5db;background:#fff;font-size:15px}
-.tabs button.on{border-color:#f59e0b;background:#f59e0b;color:#fff;font-weight:700}
-.targets{display:flex;gap:6px;margin:8px 0}
-.targets button{flex:1;padding:10px;border-radius:10px;border:3px solid transparent;font-size:15px;font-weight:700;color:#fff;opacity:.45}
-.targets button.on{opacity:1;border-color:#111827}
-.tP{background:#2563eb}.tE{background:#ea580c}
-.chars{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.ch{width:38px;border:1px solid #d1d5db;border-radius:6px;background:#fff;text-align:center;padding:2px 0;user-select:none}
-.ch .n{font-size:10px;color:var(--sub)}
-.ch .c{font-family:monospace;font-size:18px;font-weight:700;min-height:22px}
-.ch.inP{background:#2563eb;border-color:#2563eb}.ch.inP .c,.ch.inP .n{color:#fff}
-.ch.inE{background:#ea580c;border-color:#ea580c}.ch.inE .c,.ch.inE .n{color:#fff}
-.ch.pick{outline:3px solid #111827}
-.posGrp{border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-bottom:8px}
-.posTtl{font-weight:700;margin-bottom:4px}
-.posRow{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:15px}
-.posRow button{width:44px;height:44px;font-size:22px;border-radius:10px;border:1px solid #d1d5db;background:#f9fafb}
-.posRow input{width:72px;height:44px;font-size:20px;text-align:center;border:1px solid #d1d5db;border-radius:8px}
-.preview{margin-top:10px;font-size:15px;background:#fffbeb;padding:8px;border-radius:8px}
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 </head>
 <body>
-<header>
-  <h1>誤品照合 <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
-  <div><button onclick="openSettings()">⚙ 設定</button></div>
-</header>
+<title>誤品照合ステーション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDGothic:wght@400;700&display=swap">
+<style>
+/* レイアウト: 上部に作業状況バー、中央に「かんばん→現品票」の2スロット、下に履歴。NG時は全画面ロック */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --line:#cfd6de; --fg:#16202b; --muted:#5b6876;
+  --accent:#1f4e8c; --accent-fg:#ffffff; --hl:#ffe08a;
+  --ok:#17803d; --ok-bg:#e3f4e8; --ng:#c62828; --ng-bg:#fde7e7; --dup:#c25e00; --dup-bg:#fff0de; --test:#6b3fa0;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-code:"BIZ UDGothic","Noto Sans Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161c; --panel:#1a2129; --line:#2f3a46; --fg:#e7edf3; --muted:#9aa8b6; --accent:#6ea3e6; --accent-fg:#0b1520; --hl:#7a5d00;
+  --ok:#4cc574; --ok-bg:#12301d; --ng:#ff6b6b; --ng-bg:#3a1515; --dup:#ffa84d; --dup-bg:#3a2510; --test:#b48ae6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161c; --panel:#1a2129; --line:#2f3a46; --fg:#e7edf3; --muted:#9aa8b6; --accent:#6ea3e6; --accent-fg:#0b1520; --hl:#7a5d00;
+  --ok:#4cc574; --ok-bg:#12301d; --ng:#ff6b6b; --ng-bg:#3a1515; --dup:#ffa84d; --dup-bg:#3a2510; --test:#b48ae6; color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;padding-inline:16px;padding-block:12px;box-sizing:border-box}
+*{box-sizing:border-box}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:10px 14px;min-height:44px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:700}
+input,select{font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);min-height:44px;width:100%}
+.app{display:flex;flex-direction:column;gap:12px;max-width:1200px;margin:0 auto;min-height:100%}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.top h1{font-size:18px;margin:0;letter-spacing:.04em}
+.counts{display:flex;gap:6px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.cnt{padding:4px 10px;border-radius:999px;font-weight:700;font-size:14px;background:var(--panel);border:1px solid var(--line)}
+.cnt.off{color:var(--dup);border-color:var(--dup)}
+.cnt.ok{color:var(--ok)} .cnt.ng{color:var(--ng)} .cnt.dup{color:var(--dup)}
+.spacer{flex:1}
+.who{font-size:14px;color:var(--muted)}
+.testbar{background:var(--test);color:#fff;padding:8px 12px;border-radius:8px;font-weight:700;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.testbar input{flex:1;min-width:180px;background:#fff;color:#111}
+.testbar button{min-height:38px;padding:6px 10px}
+.status{border-radius:12px;padding:18px 20px;font-weight:700;font-size:clamp(22px,4vw,34px);text-align:center;border:2px solid var(--line);background:var(--panel);transition:background .15s}
+.status.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.status small{display:block;font-size:15px;font-weight:400;color:var(--muted);margin-top:4px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:760px){.slots{grid-template-columns:1fr}}
+.slot{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.slot.active{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.slot.done{border-color:var(--ok)}
+.slot h2{margin:0;font-size:15px;color:var(--muted);letter-spacing:.06em;display:flex;justify-content:space-between}
+.key{font-family:var(--f-code);font-size:clamp(26px,5vw,44px);font-weight:700;letter-spacing:.04em;word-break:break-all;min-height:1.3em}
+.key.empty{color:var(--line)}
+.raw{font-family:var(--f-code);font-size:13px;color:var(--muted);word-break:break-all;min-height:1.2em}
+.raw mark{background:var(--hl);color:inherit;border-radius:2px}
+.prog{font-variant-numeric:tabular-nums;font-size:14px}
+.hist{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.hist h2{font-size:14px;margin:0;padding:10px 14px;color:var(--muted);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hist h2 button{min-height:36px;padding:4px 12px;font-size:14px}
+.rows{max-height:34vh;overflow:auto}
+.row{display:grid;grid-template-columns:64px 76px 1fr;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);align-items:center;font-size:14px}
+.row:last-child{border-bottom:0}
+.row .t{font-variant-numeric:tabular-nums;color:var(--muted)}
+.chip{font-weight:700;text-align:center;border-radius:6px;padding:3px 0;font-size:13px}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.ng{background:var(--ng-bg);color:var(--ng)} .chip.dup{background:var(--dup-bg);color:var(--dup)}
+.row .d{min-width:0;word-break:break-all}
+.row .u{display:block;color:var(--muted);font-size:12px}
+.empty-note{padding:18px 14px;color:var(--muted);font-size:14px}
+/* ロック画面 */
+.lock{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));color:#fff;text-align:center;overflow:auto}
+.lock.ng{background:#b71c1c} .lock.dup{background:#b35400}
+.lock.flash{animation:fl .5s steps(2) 6}
+@keyframes fl{50%{filter:brightness(1.35)}}
+@media (prefers-reduced-motion:reduce){.lock.flash{animation:none}}
+.lock .big{font-size:clamp(44px,10vw,96px);font-weight:700;line-height:1}
+.lock .ttl{font-size:clamp(22px,4vw,34px);font-weight:700}
+.lock .cmp{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;text-align:left;font-family:var(--f-code);font-size:clamp(16px,2.6vw,22px);background:rgba(0,0,0,.22);padding:12px 16px;border-radius:10px;max-width:100%;word-break:break-all}
+.lock .cmp b{font-family:var(--f-body);font-weight:400;opacity:.85}
+.lock .msg{font-size:16px;opacity:.95}
+.lock button{background:#fff;color:#111;border:0;font-weight:700;min-width:220px}
+/* モーダル */
+.modal{position:fixed;inset:0;z-index:60;background:rgba(10,16,24,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.sheet{background:var(--panel);color:var(--fg);border-radius:14px;padding:18px;width:100%;max-width:560px;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.sheet h3{margin:0;font-size:18px}
+.pinbox{font-family:var(--f-code);font-size:32px;letter-spacing:.4em;text-align:center;min-height:44px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{font-size:24px;min-height:60px}
+.err{color:var(--ng);font-weight:700;min-height:1.2em;font-size:14px}
+.reasons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.reasons button.sel{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:13px;color:var(--muted)}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;margin:0}
+legend{font-weight:700;padding:0 6px}
+.check{display:flex;gap:8px;align-items:center;font-size:15px}
+.check input{width:22px;height:22px;min-height:0}
+.preview{font-family:var(--f-code);font-size:14px;word-break:break-all;background:var(--bg);border-radius:8px;padding:8px}
+.preview mark{background:var(--hl);color:inherit}
+.howto{font-size:14px;line-height:1.6;background:var(--bg);border-radius:8px;padding:8px 10px}
+.sub{font-weight:700;font-size:15px;border-top:1px solid var(--line);padding-top:10px}
+.capbar{display:flex;gap:8px;flex-wrap:wrap}
+.finder{display:flex;gap:8px}
+.finder input{flex:1;min-width:0}
+.finder button{flex:none}
+.picker{display:flex;flex-wrap:wrap;gap:3px}
+.picker .pkhint{font-size:13px;color:var(--muted)}
+.pc{min-height:0;width:30px;padding:2px 0 4px;display:flex;flex-direction:column;align-items:center;gap:1px;font-family:var(--f-code);font-size:17px;border-radius:5px;line-height:1.1}
+.pc i{font-style:normal;font-size:9px;color:var(--muted)}
+.pc.on{background:var(--hl);border-color:var(--fg)}
+.pc.pend{outline:3px solid var(--accent);outline-offset:0}
+.pkstate{font-size:13px;color:var(--accent);font-weight:700;width:100%}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+textarea{width:100%;min-height:160px;font-family:var(--f-code);font-size:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.cam{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.cam .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cam .bar span{flex:1;min-width:10em;font-size:14px;color:var(--muted)}
+.vwrap{position:relative;width:100%;max-width:520px;margin:0 auto;aspect-ratio:4/3;max-height:40vh;background:#000;border-radius:10px;overflow:hidden}
+.vwrap video{width:100%;height:100%;object-fit:cover;display:block}
+.vwrap .aim{position:absolute;inset:18% 22%;border:3px solid rgba(255,255,255,.85);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.25);transition:border-color .1s}
+.vwrap .aim.hit{border-color:#4cff7a}
+.vwrap .aim.hold{border-color:#ffd24c}
+.cam .camerr{color:var(--ng);font-size:14px;font-weight:700}
+.start{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:16px;text-align:center}
+.start p{max-width:32em;color:var(--muted);line-height:1.7;margin:0}
+.start button{font-size:22px;padding:18px 40px}
+</style>
 
-<main>
-  <!-- 照合画面 -->
-  <section id="viewMain">
-    <div class="card hidden" id="sendBanner" style="background:#fef3c7;border:2px solid #f59e0b">
-      <div style="font-weight:700;font-size:16px">🌐 オンラインです。未送信の記録が <span id="bnCnt">0</span>件あります</div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn" style="flex:1;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 Googleドライブへ送る</button>
-        <button class="btn gray" onclick="document.getElementById('sendBanner').classList.add('hidden')">あとで</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="modes">
-        <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
-        <button id="mCamera" onclick="setMode('camera')">カメラ</button>
-      </div>
-      <input id="scanInput" placeholder="ここにスキャナーで読み取り" autocomplete="off">
-      <div id="reader" class="hidden"></div>
-    </div>
+<div class="app" id="app">
+  <div class="top">
+    <h1>誤品照合ステーション</h1>
+    <div class="counts" id="counts"></div>
+    <span class="cnt" id="net">オンライン</span>
+    <div class="spacer"></div>
+    <button id="btnWho" class="who" type="button">作業者: 未設定</button>
+    <button id="btnAdmin" type="button">管理者</button>
+  </div>
 
-    <!-- 抜き取り位置（作業者が事前に設定・パスワード不要） -->
-    <div class="card" id="posCard" style="padding:10px 14px">
-      <button class="btn gray" style="width:100%" id="posToggle" onclick="togglePos()">✂ 品番の抜き取り位置を設定</button>
-      <h2 id="posTitle" class="hidden" style="margin:0">✂ 品番の抜き取り位置</h2>
-      <div id="posSummary" class="hidden"></div>
-      <div id="posEdit" class="hidden" style="margin-top:8px">
-        <div class="posGrp">
-          <div class="posTtl">客先かんばん</div>
-          <div class="posRow"><span>開始</span><button onclick="stepPos('cS',-1)">－</button><input id="pcS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cS',1)">＋</button><span>文字目</span></div>
-          <div class="posRow"><span>終了</span><button onclick="stepPos('cE',-1)">－</button><input id="pcE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('cE',1)">＋</button><span>文字目</span></div>
-          <div class="hint" id="pvC"></div>
-        </div>
-        <div class="posGrp">
-          <div class="posTtl">社内かんばん</div>
-          <div class="posRow"><span>開始</span><button onclick="stepPos('iS',-1)">－</button><input id="piS" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iS',1)">＋</button><span>文字目</span></div>
-          <div class="posRow"><span>終了</span><button onclick="stepPos('iE',-1)">－</button><input id="piE" type="number" inputmode="numeric" min="1" max="150" oninput="previewPos()"><button onclick="stepPos('iE',1)">＋</button><span>文字目</span></div>
-          <div class="hint" id="pvI"></div>
-        </div>
-        <p class="hint">1～150文字目の範囲で設定できます。下の確認は、最後に読み取ったかんばんで表示しています。</p>
-        <div class="row" style="justify-content:center">
-          <button class="btn" onclick="savePos()">この位置で保存</button>
-          <button class="btn gray" onclick="togglePos(false)">やめる</button>
-        </div>
-      </div>
-    </div>
+  <div class="testbar" id="testbar" hidden>
+    <span>試験モード（記録に「試験」が付き、重複記録は保存されません）</span>
+    <input id="manual" placeholder="コードを手入力してEnter" autocomplete="off">
+    <button type="button" data-sample="0">見本:かんばん</button>
+    <button type="button" data-sample="1">見本:現品票OK</button>
+    <button type="button" data-sample="2">見本:現品票NG</button>
+  </div>
 
-    <div class="card" id="judgeCard">
-      <div class="guide" id="guide">① 客先かんばんを読み取ってください</div>
-      <div class="steps">
-        <div class="step active" id="s1">
-          <div class="lbl">① 客先かんばん</div>
-          <div class="val" id="s1v">－</div>
-          <div class="sub" id="s1e">&nbsp;</div>
-        </div>
-        <div class="step" id="s2">
-          <div class="lbl">② 社内かんばん</div>
-          <div class="val" id="s2v">－</div>
-          <div class="sub">&nbsp;</div>
-        </div>
-      </div>
-      <div class="result" id="result">OK</div>
-      <div class="row" style="justify-content:center;margin-top:10px">
-        <button class="btn gray" onclick="cancelCurrent()">読み直し（①からやり直す）</button>
-      </div>
-    </div>
+  <div class="status" id="status">かんばんを読み取ってください<small>QRをスキャナーで読み取るだけで照合します</small></div>
 
-    <div class="card">
-      <div class="counts">
-        <div>OK<b id="cOk">0</b></div>
-        <div>NG<b id="cNg">0</b></div>
-        <div>読取済みかんばん<b id="cEda">0</b></div>
-      </div>
+  <div class="cam" id="cam" hidden>
+    <div class="bar">
+      <span id="camMsg">カメラは停止中です</span>
+      <button type="button" id="btnTorch" hidden>ライト</button>
+      <button type="button" class="primary" id="btnCam">カメラで読み取る</button>
     </div>
+    <div class="vwrap" id="vwrap" hidden><video id="video" playsinline muted></video><div class="aim" id="aim"></div></div>
+    <div class="camerr" id="camErr"></div>
+  </div>
 
-    <div class="card">
-      <h2>照合記録（日付ごと・新しい順）</h2>
-      <div class="row">
-        <select id="daySel" onchange="changeDay(this.value)" style="flex:1;min-width:140px;padding:10px;font-size:16px;border:1px solid #d1d5db;border-radius:8px"></select>
-      </div>
-      <div id="daySum" style="font-size:14px;margin:4px 0 8px"></div>
-      <div class="row">
-        <button class="btn" onclick="exportCsv('day')">この日のCSVを保存</button>
-        <button class="btn gray" onclick="exportCsv('all')">全期間のCSV</button>
-      </div>
-      <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">
-        <div style="font-size:15px">送信状況：<b id="unsentTxt">確認中…</b></div>
-        <button class="btn" style="width:100%;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 未送信分をGoogleドライブへ送る</button>
-        <p class="hint">前回送った後の新しい記録だけを1つのファイルにして送ります（追加方式・上書きなし）。ファイル名は「端末番号_誤品照合_日付_時刻.csv」なので、複数台・何回送っても名前が重なりません。オンラインにしてから押し、共有先で「ドライブ」を選んでください。</p>
-      </div>
-      <div style="max-height:300px;overflow:auto">
-        <table><thead><tr><th>時刻</th><th>客先品番</th><th>社内品番</th><th>結果</th></tr></thead>
-        <tbody id="logBody"></tbody></table>
-      </div>
+  <div class="slots">
+    <div class="slot active" id="slotP">
+      <h2><span>① かんばん（親）</span><span id="pPos"></span></h2>
+      <div class="key empty" id="pKey">—</div>
+      <div class="raw" id="pRaw"></div>
     </div>
-  </section>
-
-  <!-- 設定画面 -->
-  <section id="viewSettings" class="hidden">
-    <div class="card">
-      <h2>照合ルール</h2>
-      <div class="row"><label>品番の比較</label>
-        <select id="cfgCmp">
-          <option value="full">全桁一致</option>
-          <option value="head">短い方の桁数で前方一致</option>
-        </select>
-      </div>
-      <p class="hint">ハイフン・スペースは自動で取り除いて比較します（全角・半角どちらも）。</p>
+    <div class="slot" id="slotC">
+      <h2><span>② 現品票（子）</span><span class="prog" id="cProg"></span></h2>
+      <div class="key empty" id="cKey">—</div>
+      <div class="raw" id="cRaw"></div>
     </div>
+  </div>
 
-    <div class="card">
-      <h2>端末番号</h2>
-      <div class="row"><label>この端末の番号</label><input id="cfgDev" inputmode="numeric" maxlength="3" placeholder="例：01"></div>
-      <p class="hint">タブレット・スマホごとに違う番号（01、02、03…）を付けてください。CSVのファイル名の頭と、各記録に入ります。</p>
-    </div>
-
-    <div class="card">
-      <h2>解除パスワード（担当者が設定）</h2>
-      <div class="row"><label>新しい番号</label><input id="cfgPw" type="password" inputmode="numeric" placeholder="変更しない場合は空欄"></div>
-      <p class="hint">NGの解除と、この管理設定画面に入るときだけ使います。作業者には教えない番号にしてください。</p>
-    </div>
-
-    <div class="card">
-      <h2>音・バイブ</h2>
-      <div class="row"><label>OKの音</label><select id="cfgOk" onchange="sound('ok',true)"></select><button class="btn" style="background:#16a34a;flex:0" onclick="sound('ok',true)">▶</button></div>
-      <div class="row"><label>NGの音</label><select id="cfgNg" onchange="sound('ng',true)"></select><button class="btn red" style="flex:0" onclick="sound('ng',true)">▶</button></div>
-      <div class="row"><label>1枚目読取の音</label><select id="cfgRd" onchange="sound('read',true)"></select><button class="btn" style="flex:0" onclick="sound('read',true)">▶</button></div>
-      <div class="row"><label>音量</label>
-        <select id="cfgVol" onchange="sound('ok',true)"><option value="0.35">小</option><option value="0.7">中</option><option value="1">大</option></select></div>
-      <div class="row"><label>バイブ</label>
-        <select id="cfgVib"><option value="1">あり</option><option value="0">なし</option></select></div>
-      <p class="hint">▶で試し聞きできます。音が出ないときは、端末のメディア音量とマナーモードを確認してください。</p>
-    </div>
-
-    <div class="card">
-      <h2>照合記録の保存</h2>
-      <div class="row"><label>CSVの保存先</label>
-        <select id="cfgSave">
-          <option value="download">端末の「ダウンロード」フォルダ</option>
-          <option value="share">毎回選ぶ（Googleドライブ・メール・LINEなど）</option>
-        </select></div>
-      <p class="hint">照合記録は日付ごとにすべてタブレット内に残ります。24時になると自動で翌日の記録に切り替わります。</p>
-      <div class="row"><label>日付が変わったら</label>
-        <select id="cfgDayReset">
-          <option value="0">読取済みかんばんはそのまま</option>
-          <option value="1">読取済みかんばんもリセット</option>
-        </select></div>
-    </div>
-
-    <div class="card">
-      <h2>データ管理</h2>
-      <div class="row">
-        <button class="btn red" onclick="resetEdaban()">読取済みかんばんをリセット</button>
-        <button class="btn red" onclick="resetLog()">全期間の記録を消去</button>
-      </div>
-      <p class="hint">客先かんばんのQRの中身（全文字）がまったく同じものを「同じかんばん」としてエラーにします。枝番の位置を調べる必要はありません。便や日付が変わってリセットが必要なときに使ってください。</p>
-    </div>
-
-    <div class="row" style="justify-content:center">
-      <button class="btn" onclick="saveSettings()">保存して戻る</button>
-      <button class="btn gray" onclick="closeSettings()">保存せず戻る</button>
-    </div>
-  </section>
-</main>
-
-<!-- 開始画面（タップで音・バイブを有効化） -->
-<div id="startCover" onclick="startWork()">
-  <div style="font-size:30px;font-weight:900">誤品照合</div>
-  <div style="font-size:22px;margin-top:16px">画面をタップして作業開始</div>
-  <div style="font-size:14px;margin-top:10px;opacity:.8">（音とバイブを有効にします）</div>
+  <div class="hist">
+    <h2><span>照合履歴（新しい順）</span><button type="button" id="btnCancel">読み直し（最初から）</button></h2>
+    <div class="rows" id="rows"></div>
+  </div>
 </div>
 
-<!-- エラーロック画面 -->
-<div id="lock">
-  <h2>⚠ NG</h2>
-  <div class="msg" id="lockTitle"></div>
-  <div class="msg" id="lockDetail" style="font-size:16px"></div>
-  <input id="lockPw" type="password" inputmode="numeric" placeholder="解除番号">
-  <div id="lockErr"></div>
-  <button onclick="tryUnlock()">解除</button>
+<div class="lock" id="lock" hidden>
+  <div class="big" id="lkBig">NG</div>
+  <div class="ttl" id="lkTitle"></div>
+  <div class="cmp" id="lkCmp"></div>
+  <div class="msg">作業を止めて、班長・管理者を呼んでください。<br>解除には管理者の暗証番号（または解除用QR）が必要です。</div>
+  <button type="button" id="btnUnlock">管理者が解除する</button>
 </div>
 
-<!-- パスワード確認（設定・リセット用） -->
+<div class="modal" id="mPin" hidden>
+  <div class="sheet">
+    <h3 id="pinTitle">管理者 暗証番号</h3>
+    <div class="pinbox" id="pinbox"></div>
+    <div class="err" id="pinErr"></div>
+    <div class="pad" id="pad"></div>
+    <div class="btnrow"><button type="button" id="pinCancel">戻る</button></div>
+  </div>
+</div>
+
+<div class="modal" id="mReason" hidden>
+  <div class="sheet">
+    <h3>NGの原因と処置を選んでください</h3>
+    <div class="reasons" id="reasons"></div>
+    <div class="field"><label for="rName">解除者名</label><input id="rName" autocomplete="off"></div>
+    <div class="field"><label for="rMemo">メモ（任意）</label><input id="rMemo" autocomplete="off"></div>
+    <div class="err" id="rErr"></div>
+    <div class="btnrow"><button type="button" id="rCancel">戻る</button><button type="button" class="primary" id="rOk">記録して解除</button></div>
+  </div>
+</div>
+
+<div class="modal" id="mWho" hidden>
+  <div class="sheet">
+    <h3>作業者</h3>
+    <div class="field"><label for="whoIn">名前または社員番号</label><input id="whoIn" autocomplete="off"></div>
+    <div class="btnrow"><button type="button" id="whoCancel">戻る</button><button type="button" class="primary" id="whoOk">決定</button></div>
+  </div>
+</div>
+
+<div class="modal" id="mSet" hidden>
+  <div class="sheet">
+    <h3>管理者設定</h3>
+    <fieldset><legend>抜き取り照合（取り出した部分どうしを比較）</legend>
+      <div class="howto">① 見本QRを読み取る → ② 取り出したい<b>最初の文字</b>をタップ → ③ <b>最後の文字</b>をタップ。黄色の部分が照合に使われます。</div>
+      <div class="sub">かんばん（親）</div>
+      <div class="capbar"><button type="button" class="primary" data-cap="0">かんばんの見本QRを読む</button></div>
+      <div class="field"><label for="sSample0">かんばん見本（直接入力もできます）</label><input id="sSample0" autocomplete="off"></div>
+      <div class="finder"><input id="fnd0" placeholder="品番などを入力（例: 77217-26090）" autocomplete="off"><button type="button" data-find="0">探して選ぶ</button></div>
+      <div class="picker" id="pk0"></div>
+      <div class="grid2">
+        <div class="field"><label for="pStart">かんばん 開始桁</label><input id="pStart" type="number" min="1" inputmode="numeric"></div>
+        <div class="field"><label for="pLen">かんばん 桁数</label><input id="pLen" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div class="preview" id="pv0"></div>
+      <div class="sub">現品票（子）</div>
+      <div class="capbar"><button type="button" class="primary" data-cap="1">現品票の見本QRを読む</button></div>
+      <div class="field"><label for="sSample1">現品票見本（直接入力もできます）</label><input id="sSample1" autocomplete="off"></div>
+      <div class="finder"><input id="fnd1" placeholder="品番などを入力（例: 7721726090）" autocomplete="off"><button type="button" data-find="1">探して選ぶ</button></div>
+      <div class="picker" id="pk1"></div>
+      <div class="grid2">
+        <div class="field"><label for="cStart">現品票 開始桁</label><input id="cStart" type="number" min="1" inputmode="numeric"></div>
+        <div class="field"><label for="cLen">現品票 桁数</label><input id="cLen" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div class="preview" id="pv1"></div>
+      <label class="check"><input type="checkbox" id="ignSym">比較時にハイフン・空白を無視する</label>
+      <div class="field"><label for="childN">かんばん1枚あたりの現品票の読取数</label><input id="childN" type="number" min="1" inputmode="numeric"></div>
+    </fieldset>
+    <fieldset><legend>重複チェック</legend>
+      <div class="field"><label for="dupC">現品票の重複判定</label>
+        <select id="dupC"><option value="full">QRの全文が同じなら重複</option><option value="range">指定桁（シリアル等）が同じなら重複</option><option value="off">チェックしない</option></select></div>
+      <div class="picker" id="pk2"></div>
+      <div class="grid2">
+        <div class="field"><label for="dcStart">指定桁 開始</label><input id="dcStart" type="number" min="1" inputmode="numeric"></div>
+        <div class="field"><label for="dcLen">指定桁 桁数</label><input id="dcLen" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="dupP">かんばんの重複判定</label>
+        <select id="dupP"><option value="off">チェックしない（同じかんばんを繰り返し使う）</option><option value="full">QRの全文が同じなら重複（eかんばん等）</option></select></div>
+      <div class="field"><label for="dupDays">重複を見る期間（日）</label><input id="dupDays" type="number" min="1" inputmode="numeric"></div>
+    </fieldset>
+    <fieldset><legend>読み取り方法</legend>
+      <div class="field"><label for="inMode">この端末で使う読み取り方法</label>
+        <select id="inMode"><option value="scanner">ハンディスキャナー（テラ）</option><option value="camera">スマホ・タブレットのカメラ</option><option value="both">両方使う</option></select></div>
+    </fieldset>
+    <fieldset><legend>解除と端末</legend>
+      <div class="grid2">
+        <div class="field"><label for="newPin">暗証番号の変更（4〜8桁）</label><input id="newPin" type="password" inputmode="numeric" autocomplete="off" placeholder="変更しない"></div>
+        <div class="field"><label for="term">端末名・工程名</label><input id="term" autocomplete="off"></div>
+      </div>
+      <div class="field"><label for="unlockQR">解除用QRの内容（空欄なら使わない）</label><input id="unlockQR" autocomplete="off" placeholder="例: UNLOCK-K7Q2-9X"></div>
+      <label class="check"><input type="checkbox" id="testMode">試験モード（手入力を許可。本番では必ずオフ）</label>
+    </fieldset>
+    <fieldset><legend>記録</legend>
+      <div class="btnrow" style="justify-content:flex-start">
+        <button type="button" id="btnCsv">CSVを書き出す</button>
+        <button type="button" id="btnClear">記録を消去</button>
+      </div>
+      <textarea id="csvOut" hidden readonly></textarea>
+      <div class="btnrow" id="csvBtns" hidden style="justify-content:flex-start"><button type="button" id="btnCopy">CSVをコピー</button></div>
+      <div class="err" id="setMsg"></div>
+    </fieldset>
+    <div class="btnrow"><button type="button" id="setCancel">閉じる（保存しない）</button><button type="button" class="primary" id="setSave">保存</button></div>
+  </div>
+</div>
+
+<div class="start" id="start">
+  <h1 style="margin:0">誤品照合ステーション</h1>
+  <p>ハンディスキャナーはキーボード（HID）モード・末尾Enterで接続してください。カメラで読む場合は、管理者設定の「読み取り方法」で切り替えます。<br>開始すると画面のスリープを防ぎ、NG時に警告音が鳴ります。</p>
+  <button type="button" class="primary" id="btnStart">作業開始</button>
+</div>
+
 <script>
-const LS = {
-  get(k, d){ try{ const v = localStorage.getItem('gohin_'+k); return v===null? d : JSON.parse(v);}catch(e){return d;} },
-  set(k, v){ try{ localStorage.setItem('gohin_'+k, JSON.stringify(v)); }catch(e){} }
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem('gsh_'+k);return v?JSON.parse(v):d}catch(e){return d}},
+             set(k,v){try{localStorage.setItem('gsh_'+k,JSON.stringify(v))}catch(e){}}};
+const DEF={pStart:3,pLen:10,cStart:1,cLen:10,ignSym:true,childN:1,dupC:'full',dcStart:1,dcLen:30,dupP:'off',dupDays:3,
+           pin:'1234',term:'ライン1',input:'scanner',unlockQR:'',testMode:false,s0:'KB9021012345-001-L2',s1:'9021012345 LOT261012 S00057'};
+let CFG=Object.assign({},DEF,store.get('cfg',{}));
+let LOG=store.get('log',[]);          // 照合記録
+let DUP=store.get('dup',{});          // 重複キー → {t, id}
+let LOCK=store.get('lock',null);      // 再読込しても解除されない
+let WHO=store.get('who','');
+let S={step:'p',p:null,c:[]};
+const testDup={};
+const SAMPLES=()=>[CFG.s0,CFG.s1,'9021099999 LOT261012 S00058'];
+
+function today(t){const d=t?new Date(t):new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function hm(t){const d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
+function cut(s,st,ln){return s.substr(Math.max(0,st-1),ln)}
+function norm(s){return CFG.ignSym?s.replace(/[\s\-ー－]/g,''):s}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function markRaw(s,st,ln){if(!s)return'';const a=st-1,b=a+ln;return esc(s.slice(0,a))+'<mark>'+esc(s.slice(a,b))+'</mark>'+esc(s.slice(b))}
+function save(){store.set('log',LOG.slice(-20000));store.set('dup',DUP);store.set('lock',LOCK);}
+function pruneDup(){const lim=Date.now()-CFG.dupDays*864e5;for(const k in DUP)if(DUP[k].t<lim)delete DUP[k]}
+pruneDup();
+
+/* 音とバイブ */
+let AC=null;
+function tone(f,ms,when=0,type='square'){if(!AC)return;try{const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.value=.22;o.connect(g);g.connect(AC.destination);const t=AC.currentTime+when;o.start(t);o.stop(t+ms/1000)}catch(e){}}
+const snd={read(){tone(1800,60)},ok(){tone(1320,90);tone(1760,140,.11)},
+  ng(){for(let i=0;i<6;i++){tone(440,180,i*.36);tone(330,180,i*.36+.18)}try{navigator.vibrate&&navigator.vibrate([400,150,400,150,400])}catch(e){}},
+  deny(){tone(220,200)}};
+
+/* スキャナー入力（HIDキーボード）: 入力欄にフォーカスが無いときだけ受け付ける */
+let buf='',last=0,ft=null;
+document.addEventListener('keydown',e=>{
+  const tg=e.target;
+  if(tg&&tg.closest&&tg.closest('input,textarea,select'))return;
+  if(!$('mPin').hidden||!$('mReason').hidden||!$('mWho').hidden||!$('mSet').hidden){return}
+  if(e.key==='Enter'){e.preventDefault();flush();return}
+  if(e.key==='Tab'){e.preventDefault();return}            // 区切りのTabは無視（250ms無入力で確定）
+  if(e.ctrlKey||e.altKey||e.metaKey){e.preventDefault();return} // GS/RSなどの制御文字は無視
+  if(e.key&&e.key.length===1){e.preventDefault();const n=performance.now();if(n-last>400)buf='';buf+=e.key;last=n;clearTimeout(ft);ft=setTimeout(flush,250)}
+});
+function flush(){clearTimeout(ft);const s=buf;buf='';if(s.trim()&&CFG.input!=='camera')onScan(s,'スキャナー')}
+/* 読み取った文字の整え: 制御文字（GS・RSなど）を除き、全角英数・全角スペースを半角に、末尾の空白を除く。
+   スキャナーとカメラで同じ文字列になるので、抜き取り位置がずれない */
+function clean(s){
+  return String(s).replace(/[\u0000-\u001f\u007f]/g,'')
+    .replace(/[！-～]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xfee0)).replace(/　/g,' ')
+    .replace(/\s+$/,'');
+}
+
+let VIA='スキャナー';
+function onScan(code,via){
+  code=clean(code);if(!code)return;
+  if(capture!==null){endCapture(code);return}
+  VIA=via||'スキャナー';
+  if(LOCK){
+    if(CFG.unlockQR&&code===CFG.unlockQR){openReason();return}
+    snd.deny();return;
+  }
+  if(CFG.unlockQR&&code===CFG.unlockQR){setStatus('解除用QRです','NGが出ていないときは使いません');return}
+  if(S.step==='p'){
+    if(code.length<CFG.pStart+CFG.pLen-1)return ng('読取エラー（かんばん）','QRの桁数が設定より短いです',{p:code});
+    if(CFG.dupP==='full'){const k='P|'+code;const h=dupGet(k);if(h)return ng('かんばん重複',h,{p:code},'dup')}
+    S.p={raw:code,key:cut(code,CFG.pStart,CFG.pLen)};S.step='c';S.c=[];snd.read();
+    setStatus('現品票を読み取ってください','かんばん品番 '+S.p.key);render();return;
+  }
+  const ck=cut(code,CFG.cStart,CFG.cLen);
+  if(code===S.p.raw)return ng('同じかんばんを2回読みました','現品票のQRを読み取ってください',{p:S.p.raw,c:code});
+  if(code.length<CFG.cStart+CFG.cLen-1)return ng('読取エラー（現品票）','QRの桁数が設定より短いです',{p:S.p.raw,c:code});
+  if(S.c.some(x=>x.raw===code))return ng('現品票の重複','このかんばんで既に読み取った現品票です',{p:S.p.raw,c:code},'dup');
+  const dk=dupKeyC(code);
+  if(dk){const h=dupGet(dk);if(h)return ng('現品票の重複',h,{p:S.p.raw,c:code},'dup')}
+  if(norm(ck)!==norm(S.p.key))return ng('品番不一致','かんばんと現品票の品番が違います',{p:S.p.raw,c:code});
+  S.c.push({raw:code,key:ck});
+  if(S.c.length<CFG.childN){snd.read();setStatus('一致 — 次の現品票を読み取ってください',S.c.length+' / '+CFG.childN);render();return}
+  const id=add({r:'OK',type:'一致',p:S.p.raw,pk:S.p.key,c:S.c.map(x=>x.raw).join(' / '),ck:ck});
+  for(const x of S.c){const k=dupKeyC(x.raw);if(k)dupPut(k,id)}
+  if(CFG.dupP==='full')dupPut('P|'+S.p.raw,id);
+  save();snd.ok();
+  const st=$('status');setStatus('OK　一致しました','続けて次のかんばんを読み取ってください');st.classList.add('ok');
+  S={step:'p',p:null,c:[]};render(true);
+  setTimeout(()=>{if(S.step==='p'&&!S.p){st.classList.remove('ok')}},1800);
+}
+function dupKeyC(code){if(CFG.dupC==='off')return null;return 'C|'+(CFG.dupC==='range'?cut(code,CFG.dcStart,CFG.dcLen):code)}
+function dupGet(k){const m=CFG.testMode?testDup:DUP;const h=m[k];if(!h)return null;
+  return '前回の読取: '+today(h.t)+' '+hm(h.t)+'（記録No.'+h.id+'）'}
+function dupPut(k,id){const m=CFG.testMode?testDup:DUP;m[k]={t:Date.now(),id:id}}
+function add(o){const id=(LOG.length?LOG[LOG.length-1].id:0)+1;
+  LOG.push(Object.assign({id:id,t:Date.now(),term:CFG.term,who:WHO,via:VIA,test:!!CFG.testMode},o));return id}
+
+function ng(title,detail,codes,kind){
+  kind=kind||'ng';
+  const pk=codes.p?cut(codes.p,CFG.pStart,CFG.pLen):'',ck=codes.c?cut(codes.c,CFG.cStart,CFG.cLen):'';
+  const id=add({r:kind==='dup'?'重複':'NG',type:title,p:codes.p||'',pk:pk,c:codes.c||'',ck:ck,detail:detail});
+  LOCK={id:id,kind:kind,title:title,detail:detail,p:codes.p||'',pk:pk,c:codes.c||'',ck:ck};
+  save();showLock(true);render();
+}
+function showLock(fresh){
+  const L=$('lock');L.hidden=!LOCK;if(!LOCK)return;
+  L.className='lock '+(LOCK.kind==='dup'?'dup':'ng')+(fresh?' flash':'');
+  $('lkBig').textContent=LOCK.kind==='dup'?'重複':'NG';
+  $('lkTitle').textContent=LOCK.title;
+  let h='';
+  if(LOCK.p)h+='<b>かんばん</b><span>'+esc(LOCK.pk||LOCK.p)+'</span>';
+  if(LOCK.c)h+='<b>現品票</b><span>'+esc(LOCK.kind==='dup'?LOCK.c:(LOCK.ck||LOCK.c))+'</span>';
+  if(LOCK.detail)h+='<b>内容</b><span>'+esc(LOCK.detail)+'</span>';
+  $('lkCmp').innerHTML=h;
+  if(fresh)snd.ng();
+}
+
+/* 暗証番号パッド */
+let pin='',pinNext=null;
+const pad=$('pad');
+['1','2','3','4','5','6','7','8','9','消去','0','確定'].forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=k;
+  if(k==='確定')b.className='primary';b.onclick=()=>padKey(k);pad.appendChild(b)});
+function askPin(title,next){pin='';pinNext=next;$('pinTitle').textContent=title;$('pinErr').textContent='';drawPin();$('mPin').hidden=false}
+function drawPin(){$('pinbox').textContent='●'.repeat(pin.length)||'　'}
+function padKey(k){
+  if(k==='消去'){pin='';drawPin();return}
+  if(k==='確定'){if(pin===String(CFG.pin)){$('mPin').hidden=true;const n=pinNext;pinNext=null;n&&n()}
+    else{$('pinErr').textContent='暗証番号が違います';pin='';drawPin();snd.deny()}return}
+  if(pin.length<8){pin+=k;drawPin()}
+}
+$('pinCancel').onclick=()=>{$('mPin').hidden=true;pinNext=null};
+$('btnUnlock').onclick=()=>askPin('NG解除 — 管理者 暗証番号',openReason);
+
+/* 解除理由 */
+const REASONS=['スキャン順の誤り','現品の取り違え（正品に交換済み）','かんばん・現品票の誤り（差し替え済み）','二重読み（重複品を取り除き済み）','ラベル汚れ・読取不良','その他'];
+let reason='';
+function openReason(){reason='';const r=$('reasons');r.innerHTML='';
+  REASONS.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x;b.onclick=()=>{reason=x;[...r.children].forEach(c=>c.classList.toggle('sel',c===b))};r.appendChild(b)});
+  $('rName').value='';$('rMemo').value='';$('rErr').textContent='';$('mReason').hidden=false}
+$('rCancel').onclick=()=>{$('mReason').hidden=true};
+$('rOk').onclick=()=>{
+  if(!reason){$('rErr').textContent='原因と処置を1つ選んでください';return}
+  if(!$('rName').value.trim()){$('rErr').textContent='解除者名を入力してください';return}
+  const row=LOG.find(x=>x.id===LOCK.id);
+  if(row){row.ub=$('rName').value.trim();row.ur=reason;row.um=$('rMemo').value.trim();row.ut=Date.now()}
+  LOCK=null;S={step:'p',p:null,c:[]};save();$('mReason').hidden=true;showLock(false);
+  camSeen=performance.now(); // 解除直後、カメラに映ったままのNGラベルを読み直さない
+  setStatus('解除しました','かんばんから読み直してください');render();
 };
-const DEFAULT_CFG = { cPs:1, cPl:150, iPs:1, iPl:150, cmp:'full', pw:'0000', mode:'scanner' };
-let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
-if(!(cfg.cPl>0)) cfg.cPl = 150; if(!(cfg.iPl>0)) cfg.iPl = 150;   // 旧設定（0=最後まで）からの移行
-let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
-let dayLogs = [];                      // 表示中の日付の記録
-let todayStat = {ok:0, ng:0};          // 今日のOK/NG数
-let cur = null;                         // 読取中の客先かんばん
-let locked = false;
-let qr = null, lastCam = '', lastCamAt = 0;
 
-/* ---------- 共通処理 ---------- */
-function norm(s){
-  return String(s||'').replace(/[\-‐－―ー−–—\s　]/g,'').toUpperCase()
-    .replace(/[Ａ-Ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+/* 作業者 */
+$('btnWho').onclick=()=>{$('whoIn').value=WHO;$('mWho').hidden=false;$('whoIn').focus()};
+$('whoCancel').onclick=()=>{$('mWho').hidden=true};
+$('whoOk').onclick=()=>{WHO=$('whoIn').value.trim();store.set('who',WHO);$('mWho').hidden=true;render()};
+
+/* 読み直し: 照合途中の取消。かんばん読取後の取消も記録に残す */
+$('btnCancel').onclick=()=>{if(capture!==null){endCapture(null);return}if(LOCK)return;if(S.p){add({r:'取消',type:'読み直し',p:S.p.raw,pk:S.p.key,c:S.c.map(x=>x.raw).join(' / '),ck:''});save()}
+  S={step:'p',p:null,c:[]};setStatus('かんばんを読み取ってください','');render()};
+
+/* 管理者設定 */
+const F=['pStart','pLen','cStart','cLen','childN','dcStart','dcLen','dupDays'];
+$('btnAdmin').onclick=()=>askPin('管理者 暗証番号',openSet);
+function openSet(){
+  F.forEach(k=>$(k).value=CFG[k]);
+  $('ignSym').checked=CFG.ignSym;$('dupC').value=CFG.dupC;$('dupP').value=CFG.dupP;$('term').value=CFG.term;
+  $('unlockQR').value=CFG.unlockQR;$('testMode').checked=CFG.testMode;$('newPin').value='';$('inMode').value=CFG.input;
+  $('sSample0').value=CFG.s0;$('sSample1').value=CFG.s1;$('csvOut').hidden=true;$('csvBtns').hidden=true;$('setMsg').textContent='';clearArm=false;$('btnClear').textContent='記録を消去';
+  pkSel=[null,null,null];pv();$('mSet').hidden=false;
 }
-function cut(raw, start, len){
-  const s = Math.max(1, Number(start)||1) - 1;
-  const l = Number(len)||0;
-  return l>0 ? raw.substr(s, l) : raw.substr(s);
+/* 文字タップで抜き取り範囲を選ぶ */
+const PK=[{s:'sSample0',a:'pStart',b:'pLen'},{s:'sSample1',a:'cStart',b:'cLen'},{s:'sSample1',a:'dcStart',b:'dcLen'}];
+let pkSel=[null,null,null];
+function drawPicker(i){
+  const P=PK[i],s=$(P.s).value,box=$('pk'+i),a=+$(P.a).value||1,l=+$(P.b).value||1;
+  if(i===2&&$('dupC').value!=='range'){box.hidden=true;return}
+  box.hidden=false;
+  if(!s){box.innerHTML='<span class="pkhint">見本QRを読み取ると、ここで文字をタップして範囲を選べます</span>';return}
+  box.innerHTML=s.split('').map((ch,k)=>{const n=k+1,on=pkSel[i]===null&&n>=a&&n<a+l;
+    return '<button type="button" class="pc'+(on?' on':'')+(pkSel[i]===n?' pend':'')+'" data-n="'+n+'"><i>'+n+'</i>'+(ch===' '?'␣':esc(ch))+'</button>'}).join('')
+    +'<span class="pkstate">'+(pkSel[i]!==null?pkSel[i]+'桁目から — 最後の文字をタップしてください':(i===2?'重複判定':'照合')+'に使う範囲: '+a+'桁目から'+l+'桁')+'</span>';
 }
-function now(){
-  const d = new Date(), p = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-/* ---------- 音・バイブ ---------- */
-// read：1枚目を読んだ「ピッ」／ ok：照合OK「ピンポーン」／ ng：照合NG「ブーー」
-let actx = null;
-function audioUnlock(){
-  try{
-    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
-    if(actx.state==='suspended') actx.resume();
-  }catch(e){}
-}
-['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev, audioUnlock, {passive:true}));
-function tone(freq, start, dur, type, vol){
-  const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + start;
-  o.type = type; o.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
-  g.gain.setValueAtTime(vol, t0 + dur - 0.05);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  o.connect(g); g.connect(actx.destination);
-  o.start(t0); o.stop(t0 + dur + 0.02);
-}
-// 選べる音（[周波数, 開始秒, 長さ秒, 波形, 音量]）
-const SOUNDS = {
-  ok: {
-    chime:  ['ピンポーン',     [[1319,0,.18,'sine',.5],[1047,.2,.45,'sine',.5]]],
-    pi:     ['ピッ',           [[2000,0,.12,'sine',.5]]],
-    pipi:   ['ピピッ',         [[2000,0,.08,'sine',.5],[2000,.12,.08,'sine',.5]]],
-    domiso: ['ドミソ↑',        [[1047,0,.12,'sine',.45],[1319,.13,.12,'sine',.45],[1568,.26,.3,'sine',.45]]],
-    kira:   ['キラリン',       [[1568,0,.07,'triangle',.5],[2093,.07,.07,'triangle',.5],[2637,.14,.25,'triangle',.5]]],
-    pon:    ['ポン（低め）',   [[660,0,.25,'sine',.6]]]
-  },
-  ng: {
-    buzz:   ['ブーー',         [[140,0,1.0,'sawtooth',.6],[146,0,1.0,'square',.25]]],
-    bubu:   ['ブッブー',       [[150,0,.25,'sawtooth',.6],[150,.35,.7,'sawtooth',.6]]],
-    siren:  ['ピーポー（警報）',[[960,0,.35,'square',.35],[770,.35,.35,'square',.35],[960,.7,.35,'square',.35],[770,1.05,.35,'square',.35]]],
-    beep3:  ['ビッビッビッ',   [[880,0,.15,'square',.4],[880,.25,.15,'square',.4],[880,.5,.15,'square',.4]]],
-    down:   ['ドミソ↓（失敗音）',[[784,0,.18,'square',.35],[622,.2,.18,'square',.35],[466,.4,.5,'square',.35]]]
-  },
-  read: {
-    pi:     ['ピッ（高）',     [[1800,0,.08,'sine',.4]]],
-    pu:     ['プッ（低）',     [[900,0,.08,'sine',.5]]],
-    none:   ['音なし',         []]
+[0,1,2].forEach(i=>$('pk'+i).addEventListener('click',e=>{
+  const b=e.target.closest('.pc');if(!b)return;const n=+b.dataset.n,P=PK[i];
+  if(pkSel[i]===null){pkSel[i]=n}
+  else{const x=Math.min(pkSel[i],n),y=Math.max(pkSel[i],n);$(P.a).value=x;$(P.b).value=y-x+1;pkSel[i]=null}
+  pv();
+}));
+/* 文字で探して範囲を選ぶ（長いQR向け） */
+document.querySelectorAll('[data-find]').forEach(b=>b.onclick=()=>{
+  const i=+b.dataset.find,P=PK[i],s=$(P.s).value,q=$('fnd'+i).value.trim();
+  if(!s){$('setMsg').textContent='先に見本QRを読み取ってください';return}
+  if(!q){$('setMsg').textContent='探す文字を入力してください';return}
+  let k=s.indexOf(q);
+  if(k<0&&$('ignSym').checked){ // ハイフンなしでも探す
+    const m=[];let t='';for(let j=0;j<s.length;j++){if(!/[\s\-ー－]/.test(s[j])){m.push(j);t+=s[j]}}
+    const qq=q.replace(/[\s\-ー－]/g,''),h=t.indexOf(qq);
+    if(h>=0){const a=m[h],z=m[h+qq.length-1];$(P.a).value=a+1;$(P.b).value=z-a+1;pkSel[i]=null;$('setMsg').textContent='';pv();return}
   }
+  if(k<0){$('setMsg').textContent='「'+q+'」は見本QRの中に見つかりません';return}
+  $(P.a).value=k+1;$(P.b).value=q.length;pkSel[i]=null;$('setMsg').textContent='';pv();
+});
+$('dupC').addEventListener('change',pv);['dcStart','dcLen'].forEach(k=>$(k).addEventListener('input',pv));
+/* 見本QRの読み取り（設定を一時的に閉じてスキャナーかカメラで読む） */
+let capture=null,capCam=false;
+document.querySelectorAll('[data-cap]').forEach(b=>b.onclick=()=>{
+  capture=+b.dataset.cap;$('mSet').hidden=true;
+  setStatus('見本QRの読み取り（'+(capture?'現品票':'かんばん')+'）','スキャナーかカメラで読み取ると設定画面に戻ります。やめるときは「読み直し」');
+  $('cam').hidden=false;capCam=false;if(!stream){capCam=true;camStart()}
+});
+function endCapture(code){
+  const i=capture;capture=null;
+  if(code!==null){$(i?'sSample1':'sSample0').value=code;pkSel[i]=null}
+  if(capCam)camStop();capCam=false;
+  render();setStatus('かんばんを読み取ってください','');$('mSet').hidden=false;pv();
+}
+function pv(){
+  const a=+$('pStart').value||1,b=+$('pLen').value||1,c=+$('cStart').value||1,d=+$('cLen').value||1;
+  const s0=$('sSample0').value,s1=$('sSample1').value;
+  $('pv0').innerHTML=s0?markRaw(s0,a,b)+'<br>→ 抜き取り: <b>'+esc(cut(s0,a,b))+'</b>':'見本を入れると抜き取り位置が色で表示されます';
+  [0,1,2].forEach(drawPicker);
+  $('pv1').innerHTML=s1?markRaw(s1,c,d)+'<br>→ 抜き取り: <b>'+esc(cut(s1,c,d))+'</b>'+(s0?(norm(cut(s0,a,b))===norm(cut(s1,c,d))?'　<span style="color:var(--ok)">一致</span>':'　<span style="color:var(--ng)">不一致</span>'):''):'';
+}
+['pStart','pLen','cStart','cLen','sSample0','sSample1','ignSym'].forEach(k=>$(k).addEventListener('input',pv));
+$('setCancel').onclick=()=>{$('mSet').hidden=true};
+$('setSave').onclick=()=>{
+  const np=$('newPin').value.trim();
+  if(np&&!/^\d{4,8}$/.test(np)){$('setMsg').textContent='暗証番号は4〜8桁の数字にしてください';return}
+  F.forEach(k=>CFG[k]=Math.max(1,parseInt($(k).value,10)||DEF[k]));
+  CFG.ignSym=$('ignSym').checked;CFG.dupC=$('dupC').value;CFG.dupP=$('dupP').value;CFG.term=$('term').value.trim()||DEF.term;
+  CFG.unlockQR=$('unlockQR').value.trim();CFG.testMode=$('testMode').checked;CFG.input=$('inMode').value;
+  if(CFG.input==='scanner')camStop();CFG.s0=$('sSample0').value;CFG.s1=$('sSample1').value;
+  if(np)CFG.pin=np;
+  store.set('cfg',CFG);pruneDup();save();$('mSet').hidden=true;S={step:'p',p:null,c:[]};setStatus('設定を保存しました','かんばんを読み取ってください');render();
 };
-const SND_DEFAULT = { ok:'chime', ng:'buzz', read:'pi' };
-function sndPick(kind, preview){
-  const id = {ok:'cfgOk', ng:'cfgNg', read:'cfgRd'}[kind];
-  const v = preview ? document.getElementById(id).value : (cfg['snd_'+kind] || SND_DEFAULT[kind]);
-  return SOUNDS[kind][v] ? SOUNDS[kind][v][1] : SOUNDS[kind][SND_DEFAULT[kind]][1];
+function csv(){
+  const H=['No','日時','端末','作業者','読取方法','結果','内容','かんばんQR','かんばん抜取','現品票QR','現品票抜取','詳細','解除日時','解除者','解除理由','解除メモ','試験'];
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const L=LOG.map(r=>[r.id,today(r.t)+' '+hm(r.t),r.term,r.who,r.via||'',r.r,r.type,r.p,r.pk,r.c,r.ck,r.detail,r.ut?today(r.ut)+' '+hm(r.ut):'',r.ub,r.ur,r.um,r.test?'試験':''].map(q).join(','));
+  return '﻿'+[H.map(q).join(',')].concat(L).join('\r\n');
 }
-function sound(kind, preview){
+$('btnCsv').onclick=()=>{
+  const text=csv();
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'}));
+    a.download='誤品照合_'+CFG.term+'_'+today().replace(/-/g,'')+'.csv';document.body.appendChild(a);a.click();a.remove()}catch(e){}
+  $('csvOut').value=text.replace(/^﻿/,'');$('csvOut').hidden=false;$('csvBtns').hidden=false;
+  $('setMsg').textContent=LOG.length+'件。保存されない場合は下の「コピー」を使ってください';
+};
+$('btnCopy').onclick=()=>{const t=$('csvOut');const p=navigator.clipboard&&navigator.clipboard.writeText(t.value);
+  if(p)p.then(()=>{$('setMsg').textContent='コピーしました'}).catch(()=>{t.select()});else t.select()};
+let clearArm=false;
+$('btnClear').onclick=()=>{if(!clearArm){clearArm=true;$('btnClear').textContent='もう一度押すと全記録を消去';return}
+  LOG=[];DUP={};save();clearArm=false;$('btnClear').textContent='記録を消去';$('setMsg').textContent='記録を消去しました';render()};
+
+/* 試験モード */
+$('manual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=e.target.value.trim();e.target.value='';e.target.blur();if(v)onScan(v,'手入力')}});
+document.querySelectorAll('[data-sample]').forEach(b=>b.onclick=()=>{b.blur();onScan(SAMPLES()[+b.dataset.sample],'手入力')});
+
+/* カメラ読み取り（Android ChromeはBarcodeDetector、使えない端末はjsQR） */
+let stream=null,det=null,loopT=null,camLast='',camSeen=0,torch=false,cv=null,cx=null;
+function camBusy(){return !!LOCK||!$('mPin').hidden||!$('mReason').hidden||!$('mWho').hidden||!$('mSet').hidden}
+function loadJsQR(){return new Promise((ok,ng)=>{if(window.jsQR)return ok();const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';s.onload=ok;s.onerror=()=>ng(new Error('jsQR'));document.head.appendChild(s)})}
+async function camStart(){
+  $('camErr').textContent='';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('camErr').textContent='この画面ではカメラを使えません。https のページをChromeで開いてください。';return}
   try{
-    audioUnlock();
-    if(actx){
-      const vol = Number(preview ? document.getElementById('cfgVol').value : (cfg.vol || 0.7));
-      sndPick(kind, preview).forEach(([f,s,d,w,v]) => tone(f, s, d, w, Math.max(0.001, v*vol*1.4)));
-    }
-  }catch(e){}
-  try{
-    const vib = preview ? document.getElementById('cfgVib').value !== '0' : cfg.vib !== '0';
-    if(vib && navigator.vibrate){
-      navigator.vibrate(kind==='read' ? 40 : kind==='ok' ? 150 : [600,150,600,150,600]);
-    }
-  }catch(e){}
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+  }catch(e){$('camErr').textContent='カメラを起動できません。ブラウザのカメラ許可を「許可」にしてください。（'+(e.name||'')+'）';stream=null;return}
+  const v=$('video');v.srcObject=stream;try{await v.play()}catch(e){}
+  det=null;
+  try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('qr_code'))det=new BarcodeDetector({formats:['qr_code']})}}catch(e){det=null}
+  if(!det){try{await loadJsQR()}catch(e){$('camErr').textContent='QR読み取り部品を読み込めません。ネット接続を確認してください。';camStop();return}
+    cv=document.createElement('canvas');cx=cv.getContext('2d',{willReadFrequently:true})}
+  const tr=stream.getVideoTracks()[0];let caps={};try{caps=tr.getCapabilities?tr.getCapabilities():{}}catch(e){}
+  $('btnTorch').hidden=!caps.torch;torch=false;$('btnTorch').textContent='ライト';
+  $('vwrap').hidden=false;$('btnCam').textContent='カメラを止める';$('camMsg').textContent='枠の中にQRを映してください';
+  camLast='';camSeen=0;tick();
 }
-function beep(ok){ sound(ok ? 'ok' : 'ng'); }
-
-/* ---------- 読み取り処理 ---------- */
-function onScan(raw){
-  raw = String(raw||'').replace(/[\r\n]+$/,'');
-  if(!raw || locked) return;
-  if(!cur){
-    // ① 客先かんばん
-    const hin = cut(raw, cfg.cPs, cfg.cPl);
-    const key = raw.trim();                       // QRの全文字で同一かんばんを判定
-    if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
-    if(readC[key]){
-      return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${readC[key]}`, {hin, inner:'', kind:'かんばん重複'});
-    }
-    cur = { raw, hin, key }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
-    renderSteps();
-    sound('read');
-  }else{
-    // ② 社内かんばん
-    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
-    const a = norm(cur.hin), b = norm(ihin);
-    let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
-    if(match){
-      readC[cur.key] = now(); LS.set('readC', readC);
-      addLog(cur.hin, ihin, 'OK', cur.raw);
-      showOk();
-      cur = null; renderSteps(); beep(true);
-    }else{
-      fail('品番不一致（誤品の可能性）', `客先：${cur.hin}　／　社内：${ihin}`, {hin:cur.hin, inner:ihin, kind:'品番不一致', raw:cur.raw});
-    }
+function camStop(){clearTimeout(loopT);loopT=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  $('video').srcObject=null;$('vwrap').hidden=true;$('btnTorch').hidden=true;$('btnCam').textContent='カメラで読み取る';$('camMsg').textContent='カメラは停止中です'}
+async function tick(){
+  if(!stream)return;
+  const v=$('video');let code='';
+  if(!camBusy()&&v.readyState>=2){
+    try{
+      if(det){const r=await det.detect(v);if(r&&r.length)code=r[0].rawValue||''}
+      else{const w=Math.min(640,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);if(w&&h){cv.width=w;cv.height=h;cx.drawImage(v,0,0,w,h);
+        const r=window.jsQR(cx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});if(r)code=r.data||''}}
+    }catch(e){}
   }
-}
-function fail(title, detail, rec){
-  addLog(rec.hin||'', rec.inner||'', 'NG：' + (rec.kind||title), rec.raw||'');
-  cur = null; renderSteps();
-  lock(title, detail);
-}
-function showOk(){
-  const r = document.getElementById('result');
-  r.className = 'result ok'; r.textContent = 'OK';
-  clearTimeout(showOk.t); showOk.t = setTimeout(()=>{ r.className='result'; }, 1500);
-}
-function cancelCurrent(){ cur = null; renderSteps(); focusInput(); }
-
-/* ---------- ロック ---------- */
-function lock(title, detail){
-  locked = true;
-  document.getElementById('lockTitle').textContent = title;
-  document.getElementById('lockDetail').textContent = detail;
-  document.getElementById('lockPw').value = '';
-  document.getElementById('lockErr').textContent = '';
-  document.getElementById('lock').classList.add('show');
-  beep(false);
-  clearInterval(lock.t); lock.t = setInterval(()=>beep(false), 3000);
-  setTimeout(()=>document.getElementById('lockPw').focus(), 100);
-}
-function tryUnlock(){
-  const v = document.getElementById('lockPw').value;
-  if(v === String(cfg.pw)){
-    locked = false; clearInterval(lock.t);
-    document.getElementById('lock').classList.remove('show');
-    focusInput();
-  }else{
-    document.getElementById('lockErr').textContent = '番号が違います';
-    document.getElementById('lockPw').value = '';
+  code=code.trim();const now=performance.now(),aim=$('aim');
+  if(code){
+    // 同じQRを映し続けている間は1回だけ読む（離して2秒たてば再び読む＝重複も検知できる）
+    if(code===camLast&&now-camSeen<2000){camSeen=now;aim.className='aim hold'}
+    else{camLast=code;camSeen=now;aim.className='aim hit';onScan(code,'カメラ');setTimeout(()=>{aim.className='aim'},400)}
   }
+  loopT=setTimeout(tick,det?120:180);
 }
-document.getElementById('lockPw').addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+$('btnCam').onclick=()=>{stream?camStop():camStart()};
+$('btnTorch').onclick=async()=>{if(!stream)return;try{torch=!torch;await stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torch}]});$('btnTorch').textContent=torch?'ライト消灯':'ライト'}catch(e){}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&stream)camStop()});
 
-/* ---------- 表示 ---------- */
-function renderSteps(){
-  const s1 = document.getElementById('s1'), s2 = document.getElementById('s2');
-  if(cur){
-    s1.className='step done'; s2.className='step active';
-    document.getElementById('s1v').textContent = cur.hin;
-    document.getElementById('s1e').textContent = '読取OK';
-    document.getElementById('guide').textContent = '② 社内かんばんを読み取ってください';
-  }else{
-    s1.className='step active'; s2.className='step';
-    document.getElementById('s1v').textContent = '－';
-    document.getElementById('s1e').innerHTML = '&nbsp;';
-    document.getElementById('guide').textContent = '① 客先かんばんを読み取ってください';
-  }
-  document.getElementById('s2v').textContent = '－';
-  document.getElementById('cOk').textContent = todayStat.ok;
-  document.getElementById('cNg').textContent = todayStat.ng;
-  document.getElementById('cEda').textContent = Object.keys(readC).length;
-}
-function dayKey(d){ d = d || new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
-function dayLabel(k){ const [y,m,d] = k.split('-'); const w='日月火水木金土'[new Date(+y,+m-1,+d).getDay()]; return `${y}/${m}/${d}（${w}）`; }
-let today = dayKey(), viewDay = today, dbh = null;
-
-// --- IndexedDB（タブレット内に大量の記録を安全に保存） ---
-function dbOpen(){
-  return new Promise((res, rej)=>{
-    const r = indexedDB.open('gohin', 1);
-    r.onupgradeneeded = () => { const s = r.result.createObjectStore('logs', {keyPath:'id', autoIncrement:true}); s.createIndex('day','day'); };
-    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
-  });
-}
-function dbTx(mode, fn){
-  return new Promise((res, rej)=>{
-    const tx = dbh.transaction('logs', mode), st = tx.objectStore('logs');
-    let out; Promise.resolve(fn(st, v => out = v)).catch(rej);
-    tx.oncomplete = () => res(out); tx.onerror = () => rej(tx.error);
-  });
-}
-const dbAdd  = rec => dbTx('readwrite', st => st.add(rec));
-const dbDay  = day => dbTx('readonly', (st, set) => { const r = st.index('day').getAll(day); r.onsuccess = () => set(r.result); });
-const dbAll  = ()  => dbTx('readonly', (st, set) => { const r = st.getAll(); r.onsuccess = () => set(r.result); });
-const dbClear= ()  => dbTx('readwrite', st => st.clear());
-const dbPut  = rec => dbTx('readwrite', st => st.put(rec));
-function nextNo(){ const n = (LS.get('seq', 0) || 0) + 1; LS.set('seq', n); return n; }   // 消去してもリセットしない通し番号
-const dbDays = ()  => dbTx('readonly', (st, set) => {
-  const out = []; const r = st.index('day').openKeyCursor(null, 'prevunique');
-  r.onsuccess = () => { const c = r.result; if(c){ out.push(c.key); c.continue(); } else set(out); };
-});
-
-function addLog(hin, inner, r, raw){
-  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo()};
-  if(rec.day !== today) rollDay();
-  if(r==='OK') todayStat.ok++; else todayStat.ng++;
-  if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
-  renderSteps();
-  if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); if(!document.querySelector(`#daySel option[value="${rec.day}"]`)) refreshDays(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
-}
-function renderLog(){
-  const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="hint">この日の記録はありません</td></tr>';
-  const ok = dayLogs.filter(l=>l.r==='OK').length;
-  document.getElementById('daySum').innerHTML =
-    `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.length-ok}</b>件` +
-    (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
-}
-async function refreshDays(){
-  let days = dbh ? await dbDays() : [];
-  if(!days.includes(today)) days.unshift(today);
-  days.sort().reverse();
-  document.getElementById('daySel').innerHTML = days.map(d => `<option value="${d}" ${d===viewDay?'selected':''}>${dayLabel(d)}${d===today?'　今日':''}</option>`).join('');
-}
-async function changeDay(d){
-  viewDay = d;
-  dayLogs = dbh ? (await dbDay(d)).reverse() : [];
-  renderLog();
-}
-function rollDay(){                     // 24時を過ぎたら翌日の記録へ切り替え
-  const prev = today; today = dayKey();
-  if(prev === today) return;
-  todayStat = {ok:0, ng:0};
-  if(cfg.dayReset === '1'){ readC = {}; LS.set('readC', readC); }
-  if(viewDay === prev){ viewDay = today; dayLogs = []; }
-  refreshDays(); renderLog(); renderSteps(); refreshSendState();
-}
-setInterval(()=>{ if(dayKey() !== today) rollDay(); }, 10000);
-
-/* OK／NG を選ぶ確認画面（buttons=false で「閉じる」だけのお知らせ） */
-function askOkNg(title, body, buttons=true){
-  return new Promise(resolve=>{
-    const ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-    const btn = 'flex:1;font-size:22px;font-weight:700;padding:18px 0;border:none;border-radius:12px;color:#fff';
-    ov.innerHTML = `<div style="background:#fff;color:#1b1f24;border-radius:16px;padding:22px;max-width:440px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3)">
-      <div style="font-size:20px;font-weight:700;margin-bottom:10px">${title}</div>
-      <div style="font-size:15px;line-height:1.6;margin-bottom:20px;word-break:break-all">${body}</div>
-      <div style="display:flex;gap:12px">${buttons
-        ? `<button data-v="1" style="${btn};background:#16a34a">OK</button><button data-v="0" style="${btn};background:#dc2626">NG</button>`
-        : `<button data-v="1" style="${btn};background:#2563eb">閉じる</button>`}</div></div>`;
-    ov.addEventListener('click', e=>{ const v = e.target.dataset && e.target.dataset.v; if(v!==undefined){ ov.remove(); resolve(v==='1'); } });
-    document.body.appendChild(ov);
-  });
+/* 表示 */
+function setStatus(a,b){const s=$('status');s.classList.remove('ok');s.innerHTML=esc(a)+(b?'<small>'+esc(b)+'</small>':'')}
+function render(keepDone){
+  const td=today(),tl=LOG.filter(r=>today(r.t)===td&&!r.test);
+  const n=r=>tl.filter(x=>x.r===r).length,un=tl.filter(x=>x.ut).length;
+  $('counts').innerHTML='<span class="cnt ok">OK '+n('OK')+'</span><span class="cnt ng">NG '+n('NG')+'</span><span class="cnt dup">重複 '+n('重複')+'</span><span class="cnt">解除 '+un+'</span>';
+  $('btnWho').textContent='作業者: '+(WHO||'未設定')+'　'+CFG.term;
+  $('testbar').hidden=!CFG.testMode;
+  $('cam').hidden=CFG.input==='scanner';
+  $('pPos').textContent=CFG.pStart+'桁目から'+CFG.pLen+'桁';
+  $('slotP').classList.toggle('active',S.step==='p');$('slotC').classList.toggle('active',S.step==='c');
+  $('slotP').classList.toggle('done',S.step==='c');
+  if(S.p){$('pKey').textContent=S.p.key;$('pKey').classList.remove('empty');$('pRaw').innerHTML=markRaw(S.p.raw,CFG.pStart,CFG.pLen)}
+  else if(!keepDone){$('pKey').textContent='—';$('pKey').classList.add('empty');$('pRaw').innerHTML=''}
+  const lc=S.c[S.c.length-1];
+  if(lc){$('cKey').textContent=lc.key;$('cKey').classList.remove('empty');$('cRaw').innerHTML=markRaw(lc.raw,CFG.cStart,CFG.cLen)}
+  else if(!keepDone){$('cKey').textContent='—';$('cKey').classList.add('empty');$('cRaw').innerHTML=''}
+  $('cProg').textContent=CFG.cStart+'桁目から'+CFG.cLen+'桁　'+S.c.length+'/'+CFG.childN;
+  if(keepDone){setTimeout(()=>{if(S.step==='p'&&!S.p){render()}},1800)}
+  const rows=LOG.slice(-40).reverse();
+  $('rows').innerHTML=rows.length?rows.map(r=>{
+    const cls=r.r==='OK'?'ok':r.r==='重複'?'dup':r.r==='取消'?'':'ng';
+    const u=r.ut?'<span class="u">解除 '+hm(r.ut)+' '+esc(r.ub)+'：'+esc(r.ur)+(r.um?'（'+esc(r.um)+'）':'')+'</span>':(r.r==='NG'||r.r==='重複')?'<span class="u">未解除</span>':'';
+    return '<div class="row"><span class="t">'+hm(r.t)+'</span><span class="chip '+cls+'">'+esc(r.r)+(r.test?'・試':'')+'</span><span class="d">'+esc(r.type)+'　'+esc(r.pk||'')+(r.ck&&r.ck!==r.pk?' ⇔ '+esc(r.ck):'')+u+'</span></div>'}).join('')
+    :'<div class="empty-note">まだ記録がありません。かんばん → 現品票の順にQRを読み取ると、ここに結果が並びます。</div>';
 }
 
-async function exportCsv(scope){
-  const list = scope==='all' ? (dbh ? await dbAll() : []) : dayLogs.slice().reverse();
-  if(!list.length){ await askOkNg('記録がありません', 'CSVにする照合記録がありません。', false); return; }
-  if(scope==='all') list.sort((a,b)=> a.t < b.t ? -1 : 1);
-  const what = scope==='all' ? '全期間' : viewDay.replace(/-/g,'/');
-  if(!await askOkNg(`${what}のCSVを保存しますか？`, `${list.length}件の記録を保存します。<br>保存する → <b style="color:#16a34a">OK</b>　やめる → <b style="color:#dc2626">NG</b>`)) return;
-  const csv = csvOf(list);
-  const name = scope==='all' ? `${devTag()}_誤品照合_全期間_${stamp()}.csv` : `${devTag()}_誤品照合_${viewDay.replace(/-/g,'')}_${stamp()}.csv`;
-  const file = new File([csv], name, {type:'text/csv'});
-  if(cfg.saveMode==='share' && navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:name}); await askOkNg('保存しました', name, false); return; }
-    catch(e){ if(e && e.name==='AbortError'){ await askOkNg('保存を中止しました', '共有先を選ばずに閉じたため、保存されていません。', false); return; } }
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file); a.download = name; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-  await askOkNg('保存しました', `${name}<br><span style="color:#5b6470">スマホの「ダウンロード」フォルダに入っています。</span>`, false);
-}
+/* 開始 */
+let wl=null;
+async function wake(){try{if(navigator.wakeLock)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!$('start').hidden===false)wake()});
+$('btnStart').onclick=()=>{try{AC=new (window.AudioContext||window.webkitAudioContext)();AC.resume()}catch(e){}
+  $('start').hidden=true;wake();snd.read();showLock(false)};
+render();showLock(false);
+if(LOCK)$('start').hidden=true;
 
-/* ---------- Googleドライブへの送信（オンライン時にまとめて） ---------- */
-let lastSentNo = LS.get('lastSentNo', 0);   // ここまでの通し番号は送信済み
-function devTag(){ return '端末' + (cfg.dev || '未設定'); }
-function stamp(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
-function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? '端末'+cfg.dev : '端末番号未設定'; b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
-async function unsentList(){
-  const all = dbh ? await dbAll() : [];
-  return all.filter(l => (l.no||0) > lastSentNo).sort((a,b)=> a.no - b.no);
-}
-async function refreshSendState(){
-  const un = await unsentList();
-  document.getElementById('unsentTxt').innerHTML = un.length
-    ? `<span style="color:#b45309">未送信 ${un.length}件</span>（通し番号 ${un[0].no}～${un[un.length-1].no}）`
-    : `<span style="color:#16a34a">すべて送信済み</span>${lastSentNo ? `（通し番号 ${lastSentNo} まで）` : ''}`;
-  document.getElementById('bnCnt').textContent = un.length;
-  if(!(navigator.onLine && un.length)) document.getElementById('sendBanner').classList.add('hidden');
-  return {count: un.length};
-}
-function csvOf(list){
-  const q = s => '"' + String(s).replace(/"/g,'""') + '"';
-  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文']]
-    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'']));
-  return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
-}
-
-async function sendToDrive(){
-  if(!cfg.dev){ alert('先に⚙設定で「端末番号」を設定してください（例：01）。\n複数台のファイル名が重ならないようにするためです。'); return; }
-  const list = await unsentList();
-  if(!list.length){ alert('未送信の記録はありません'); return; }
-  if(!navigator.onLine && !confirm('オフラインのようです。このまま続けますか？')) return;
-  const upto = list[list.length-1].no;
-  const name = `${devTag()}_誤品照合_${stamp()}.csv`;
-  const files = [new File([csvOf(list)], name, {type:'text/csv'})];
-  let done = false;
-  if(navigator.canShare && navigator.canShare({files})){
-    try{ await navigator.share({files, title:name}); done = true; }
-    catch(e){ if(e && e.name==='AbortError') return; }
-  }
-  if(!done){ const a=document.createElement('a'); a.href=URL.createObjectURL(files[0]); a.download=name; a.click(); }
-  if(confirm(`「${name}」（${list.length}件・通し番号 ${list[0].no}～${upto}）をGoogleドライブに保存できましたか？\n「OK」で送信済みにします。`)){
-    lastSentNo = upto; LS.set('lastSentNo', lastSentNo);
-    LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name, from:list[0].no, to:upto, n:list.length}]).slice(-500));
-    refreshSendState();
-  }
-}
-window.addEventListener('online', async ()=>{
-  const {count} = await refreshSendState();
-  if(count) document.getElementById('sendBanner').classList.remove('hidden');
-});
-
-async function initRecords(){
-  try{
-    dbh = await dbOpen();
-    if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-    const old = LS.get('logs', []);       // 旧版の記録を引き継ぐ
-    if(old.length){
-      for(const l of old.slice().reverse()) await dbAdd({day:String(l.t).slice(0,10).replace(/\//g,'-'), t:l.t, hin:l.hin||'', inner:l.inner||'', r:l.r, raw:l.raw||''});
-      LS.set('logs', []);
-    }
-    const noNo = (await dbAll()).filter(l=>!l.no).sort((a,b)=>a.id-b.id);
-    for(const l of noNo){ l.no = nextNo(); l.dev = l.dev || cfg.dev || ''; await dbPut(l); }
-    const t = await dbDay(today);
-    todayStat = {ok:t.filter(l=>l.r==='OK').length, ng:t.filter(l=>l.r!=='OK').length};
-    dayLogs = t.reverse();
-  }catch(e){ alert('記録用の保存領域を開けませんでした：' + e); }
-  await refreshDays(); renderLog(); renderSteps();
-  const {count} = await refreshSendState();
-  if(navigator.onLine && count) document.getElementById('sendBanner').classList.remove('hidden');
-}
-
-/* ---------- 入力（スキャナー／カメラ） ---------- */
-const inp = document.getElementById('scanInput');
-inp.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); const v = inp.value; inp.value=''; onScan(v); }
-});
-function focusInput(){ if(cfg.mode==='scanner' && !locked && !document.getElementById('viewMain').classList.contains('hidden')) inp.focus(); }
-document.addEventListener('click', e=>{ if(!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) focusInput(); });
-
-function setMode(m){
-  cfg.mode = m; LS.set('cfg', cfg);
-  document.getElementById('mScanner').classList.toggle('on', m==='scanner');
-  document.getElementById('mCamera').classList.toggle('on', m==='camera');
-  inp.classList.toggle('hidden', m!=='scanner');
-  document.getElementById('reader').classList.toggle('hidden', m!=='camera');
-  if(m==='camera') startCamera(); else { stopCamera(); focusInput(); }
-}
-function startCamera(){
-  if(typeof Html5Qrcode==='undefined'){ alert('カメラ機能を読み込めませんでした。一度ネットにつながった状態でこのページを開くと、以後はオフラインでも使えます。ハンディスキャナーはそのまま使えます。'); return; }
-  if(qr) return;
-  qr = new Html5Qrcode('reader');
-  qr.start({facingMode:'environment'}, {fps:10, qrbox:{width:250,height:250}}, text=>{
-    const t = Date.now();
-    if(text===lastCam && t-lastCamAt < 2500) return;   // 同じQRの連続読み取りを防ぐ
-    lastCam = text; lastCamAt = t; onScan(text);
-  }).catch(err=>{ alert('カメラを起動できませんでした：' + err); qr = null; });
-}
-function stopCamera(){ if(qr){ qr.stop().catch(()=>{}).finally(()=>{ qr=null; }); } }
-
-/* ---------- 設定 ---------- */
-function askPw(){
-  const v = prompt('解除番号を入力してください');
-  if(v===null) return false;
-  if(v===String(cfg.pw)) return true;
-  alert('番号が違います'); return false;
-}
-function openSettings(){
-  if(locked || !askPw()) return;
-  stopCamera();
-  const f = (id,v)=>document.getElementById(id).value = v;
-  const opts = (id, kind) => document.getElementById(id).innerHTML =
-    Object.entries(SOUNDS[kind]).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join('');
-  opts('cfgOk','ok'); opts('cfgNg','ng'); opts('cfgRd','read');
-  f('cfgOk', cfg.snd_ok||SND_DEFAULT.ok); f('cfgNg', cfg.snd_ng||SND_DEFAULT.ng); f('cfgRd', cfg.snd_read||SND_DEFAULT.read);
-  f('cfgVol', String(cfg.vol||0.7)); f('cfgVib', cfg.vib||'1'); f('cfgSave', cfg.saveMode||'download'); f('cfgDayReset', cfg.dayReset||'0');
-  f('cfgCmp',cfg.cmp); f('cfgPw',''); f('cfgDev', cfg.dev||'');
-  document.getElementById('viewMain').classList.add('hidden');
-  document.getElementById('viewSettings').classList.remove('hidden');
-}
-function closeSettings(){
-  document.getElementById('viewSettings').classList.add('hidden');
-  document.getElementById('viewMain').classList.remove('hidden');
-  setMode(cfg.mode);
-}
-function saveSettings(){
-  const g = id => document.getElementById(id).value;
-  cfg.cmp=g('cfgCmp');
-  cfg.snd_ok=g('cfgOk'); cfg.snd_ng=g('cfgNg'); cfg.snd_read=g('cfgRd'); cfg.vol=g('cfgVol'); cfg.vib=g('cfgVib');
-  cfg.saveMode=g('cfgSave'); cfg.dayReset=g('cfgDayReset');
-  const dv = g('cfgDev').trim().replace(/[^0-9A-Za-z]/g,'');
-  if(!dv){ alert('端末番号を入力してください（例：01）'); return; }
-  cfg.dev = /^\d$/.test(dv) ? '0'+dv : dv; renderDev();
-  const pw = g('cfgPw').trim();
-  if(pw){ if(pw.length<4){ alert('番号は4桁以上にしてください'); return; } cfg.pw = pw; }
-  LS.set('cfg', cfg); alert('保存しました'); closeSettings();
-}
-function resetEdaban(){ if(confirm('読取済みかんばんの記録をすべて消去します。よろしいですか？')){ readC={}; LS.set('readC',readC); renderSteps(); alert('リセットしました'); } }
-async function resetLog(){
-  if(!confirm('全期間の照合記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
-  if(!confirm('本当に消去しますか？元に戻せません。')) return;
-  if(dbh) await dbClear();
-  todayStat = {ok:0, ng:0}; dayLogs = []; await refreshDays(); renderLog(); renderSteps();
-}
-
-/* ---------- 抜き取り位置（事前設定・パスワード不要） ---------- */
-let lastRaw = LS.get('lastRaw', {c:'', i:''});
-const clampPos = v => Math.min(150, Math.max(1, Math.round(Number(v)||1)));
-function posFromCfg(){ return { cS:cfg.cPs, cE:cfg.cPs+cfg.cPl-1, iS:cfg.iPs, iE:cfg.iPs+cfg.iPl-1 }; }
-function renderPosSummary(){
-  const p = posFromCfg();
-  document.getElementById('posSummary').innerHTML =
-    `客先：<b>${p.cS}～${Math.min(150,p.cE)}</b>文字目　／　社内：<b>${p.iS}～${Math.min(150,p.iE)}</b>文字目`;
-}
-function togglePos(open){
-  const ed = document.getElementById('posEdit');
-  const show = open===undefined ? ed.classList.contains('hidden') : open;
-  ed.classList.toggle('hidden', !show);
-  document.getElementById('posToggle').classList.toggle('hidden', show);
-  document.getElementById('posTitle').classList.toggle('hidden', !show);
-  if(show){
-    const p = posFromCfg();
-    ['cS','cE','iS','iE'].forEach(k=>document.getElementById('p'+k).value = clampPos(p[k]));
-    previewPos();
-  }else focusInput();
-}
-function stepPos(k, d){
-  const el = document.getElementById('p'+k);
-  el.value = clampPos((Number(el.value)||1) + d); previewPos();
-}
-function previewPos(){
-  LS.set('lastRaw', lastRaw);
-  const v = k => clampPos(document.getElementById('p'+k).value);
-  const show = (raw, s, e, id) => {
-    const el = document.getElementById(id);
-    if(e < s){ el.innerHTML = '<span style="color:#dc2626">終了は開始以上にしてください</span>'; return; }
-    el.textContent = raw ? `直近の読取 → 「${[...raw].slice(s-1, e).join('')}」` : '（まだ読み取りがありません）';
-  };
-  show(lastRaw.c, v('cS'), v('cE'), 'pvC');
-  show(lastRaw.i, v('iS'), v('iE'), 'pvI');
-}
-function savePos(){
-  const v = k => clampPos(document.getElementById('p'+k).value);
-  if(v('cE') < v('cS') || v('iE') < v('iS')){ alert('終了位置は開始位置以上にしてください'); return; }
-  cfg.cPs = v('cS'); cfg.cPl = v('cE') - v('cS') + 1;
-  cfg.iPs = v('iS'); cfg.iPl = v('iE') - v('iS') + 1;
-  LS.set('cfg', cfg);
-  cur = null; renderSteps(); renderPosSummary(); togglePos(false);
-  sound('read');
-}
-
-/* ---------- 起動 ---------- */
-function startWork(){
-  audioUnlock(); sound('read');
-  document.getElementById('startCover').classList.add('hidden');
-  setMode(cfg.mode);
-}
-renderSteps(); renderPosSummary(); renderDev(); initRecords();
-
-/* ---------- オフライン対応 ---------- */
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
-function netState(){ document.getElementById('netBadge').classList.toggle('hidden', navigator.onLine); }
-window.addEventListener('online', netState); window.addEventListener('offline', netState); netState();
+/* オフライン対応（GitHub Pagesなど https で開いたときだけ） */
+try{if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{})}}catch(e){}
+function netState(){const el=$('net');if(!el)return;const on=navigator.onLine;el.textContent=on?'オンライン':'オフライン';el.className='cnt '+(on?'':'off')}
+window.addEventListener('online',netState);window.addEventListener('offline',netState);netState();
+})();
 </script>
+
 </body>
 </html>
