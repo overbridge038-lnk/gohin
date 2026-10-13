@@ -278,6 +278,8 @@ let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照
 let dayLogs = [];                      // 表示中の日付の記録
 let todayStat = {ok:0, ng:0};          // 今日のOK/NG数
 let cur = null;                         // 読取中の客先かんばん
+let recheck = null;                     // 品番不一致NGの客先かんばん（解除後に正規の社内かんばんで再照合する）
+let lastScan = {v:'', t:0};             // 同じ読取データが一瞬で2回届いたときの二重処理防止
 let locked = false;
 let qr = null, lastCam = '', lastCamAt = 0;
 
@@ -365,11 +367,17 @@ function beep(ok){ sound(ok ? 'ok' : 'ng'); }
 function onScan(raw){
   raw = String(raw||'').replace(/[\r\n]+$/,'');
   if(!raw || locked) return;
+  const tNow = Date.now();
+  if(raw === lastScan.v && tNow - lastScan.t < 1200) return;   // スキャナー・入力の二重送信は無視
+  lastScan = {v:raw, t:tNow};
   if(!cur){
     // ① 客先かんばん
     const hin = cut(raw, cfg.cPs, cfg.cPl);
     const key = raw.trim();                       // QRの全文字で同一かんばんを判定
     if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
+    if(recheck && key === recheck.key){                // NGになった客先かんばんの読み直し → 再照合として受け付ける（重複にしない）
+      cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
+    }
     if(readC[key]){
       return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${readC[key]}`, {hin, inner:'', kind:'かんばん重複'});
     }
@@ -378,21 +386,28 @@ function onScan(raw){
     sound('read');
   }else{
     // ② 社内かんばん
+    if(cur.recheck && raw.trim() === cur.key){ sound('read'); return; }   // 再照合中に同じ客先かんばんを読み直しても、そのまま②を待つ
     const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
     const a = norm(cur.hin), b = norm(ihin);
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
-      addLog(cur.hin, ihin, 'OK', cur.raw);
+      addLog(cur.hin, ihin, 'OK', cur.raw, cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : '');
       showOk();
-      cur = null; renderSteps(); beep(true);
+      cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
     }else{
       fail('品番不一致（誤品の可能性）', `客先：${cur.hin}　／　社内：${ihin}`, {hin:cur.hin, inner:ihin, kind:'品番不一致', raw:cur.raw});
     }
   }
 }
 function fail(title, detail, rec){
-  addLog(rec.hin||'', rec.inner||'', 'NG：' + (rec.kind||title), rec.raw||'');
+  const log = addLog(rec.hin||'', rec.inner||'', 'NG：' + (rec.kind||title), rec.raw||'',
+                     cur && cur.recheck ? `再照合でもNG（前回NG 通し番号 ${cur.ngNo}）` : '');
+  // 品番不一致のときは客先かんばんを覚えておき、解除後に正規の社内かんばんで再照合させる
+  if(rec.kind === '品番不一致' && cur){
+    recheck = { raw:cur.raw, hin:cur.hin, key:cur.key, ngNo:log.no };
+    LS.set('recheck', recheck);
+  }
   cur = null; renderSteps();
   lock(title, detail);
 }
@@ -405,7 +420,7 @@ function cancelCurrent(){ cur = null; renderSteps(); focusInput(); }
 
 /* ---------- ロック ---------- */
 function lock(title, detail){
-  locked = true;
+  locked = true; LS.set('lockState', {title, detail});
   document.getElementById('lockTitle').textContent = title;
   document.getElementById('lockDetail').textContent = detail;
   document.getElementById('lockPw').value = '';
@@ -418,8 +433,11 @@ function lock(title, detail){
 function tryUnlock(){
   const v = document.getElementById('lockPw').value;
   if(v === String(cfg.pw)){
-    locked = false; clearInterval(lock.t);
+    locked = false; clearInterval(lock.t); LS.set('lockState', null);
     document.getElementById('lock').classList.remove('show');
+    if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); }   // NGの客先かんばんはそのまま。正規の社内かんばんを待つ
+    lastScan = {v:'', t:0};
+    renderSteps();
     focusInput();
   }else{
     document.getElementById('lockErr').textContent = '番号が違います';
@@ -434,8 +452,10 @@ function renderSteps(){
   if(cur){
     s1.className='step done'; s2.className='step active';
     document.getElementById('s1v').textContent = cur.hin;
-    document.getElementById('s1e').textContent = '読取OK';
-    document.getElementById('guide').textContent = '② 社内かんばんを読み取ってください';
+    document.getElementById('s1e').textContent = cur.recheck ? 'NG後の再照合' : '読取OK';
+    document.getElementById('guide').textContent = cur.recheck
+      ? 'NGのやり直し：正しい社内かんばんを読み取ってください'
+      : '② 社内かんばんを読み取ってください';
   }else{
     s1.className='step active'; s2.className='step';
     document.getElementById('s1v').textContent = '－';
@@ -477,18 +497,19 @@ const dbDays = ()  => dbTx('readonly', (st, set) => {
   r.onsuccess = () => { const c = r.result; if(c){ out.push(c.key); c.continue(); } else set(out); };
 });
 
-function addLog(hin, inner, r, raw){
-  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo()};
+function addLog(hin, inner, r, raw, note){
+  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo(), note:note||''};
   if(rec.day !== today) rollDay();
   if(r==='OK') todayStat.ok++; else todayStat.ng++;
   if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
   renderSteps();
   if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); if(!document.querySelector(`#daySel option[value="${rec.day}"]`)) refreshDays(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
+  return rec;
 }
 function renderLog(){
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}</td></tr>`).join('')
+    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
     || '<tr><td colspan="4" class="hint">この日の記録はありません</td></tr>';
   const ok = dayLogs.filter(l=>l.r==='OK').length;
   document.getElementById('daySum').innerHTML =
@@ -572,8 +593,8 @@ async function refreshSendState(){
 }
 function csvOf(list){
   const q = s => '"' + String(s).replace(/"/g,'""') + '"';
-  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文']]
-    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'']));
+  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文','備考']]
+    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'', l.note||'']));
   return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 
@@ -814,6 +835,13 @@ function startWork(){
   setMode(cfg.mode);
 }
 renderSteps(); renderPosSummary(); renderDev(); initRecords();
+// 画面を開き直してもNGロックは解除されない。再照合待ちも引き継ぐ
+(function restoreState(){
+  recheck = LS.get('recheck', null);
+  const lk = LS.get('lockState', null);
+  if(lk){ lock(lk.title, lk.detail); return; }
+  if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); }
+})();
 
 /* ---------- オフライン対応 ---------- */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
