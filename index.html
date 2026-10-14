@@ -228,7 +228,7 @@ h2{font-size:16px;margin:4px 0 10px}
       <div class="row"><label>NGの音</label><select id="cfgNg" onchange="sound('ng',true)"></select><button class="btn red" style="flex:0" onclick="sound('ng',true)">▶</button></div>
       <div class="row"><label>1枚目読取の音</label><select id="cfgRd" onchange="sound('read',true)"></select><button class="btn" style="flex:0" onclick="sound('read',true)">▶</button></div>
       <div class="row"><label>音量</label>
-        <select id="cfgVol" onchange="sound('ok',true)"><option value="0.35">小</option><option value="0.7">中</option><option value="1">大</option></select></div>
+        <select id="cfgVol" onchange="sound('ok',true)"><option value="0.35">小</option><option value="0.7">中</option><option value="1">大</option><option value="1.6">最大（騒音のある場所向け）</option></select></div>
       <div class="row"><label>バイブ</label>
         <select id="cfgVib"><option value="1">あり</option><option value="0">なし</option></select></div>
       <p class="hint">▶で試し聞きできます。音が出ないときは、端末のメディア音量とマナーモードを確認してください。</p>
@@ -337,6 +337,10 @@ function tone(freq, start, dur, type, vol){
 // 選べる音（[周波数, 開始秒, 長さ秒, 波形, 音量]）
 const SOUNDS = {
   ok: {
+    // 騒音の多い工場向け：聞き取りやすい2～3kHz帯の矩形波で約1秒鳴らす
+    chiro:  ['チロリロリン（約1秒・工場向け）', [[2637,0,.09,'square',.5],[2093,.1,.09,'square',.5],[2637,.2,.09,'square',.5],[2093,.3,.09,'square',.5],[2637,.4,.09,'square',.5],[3136,.5,.5,'square',.5]]],
+    chiro2: ['チロリロリン×2（約2秒・さらに目立つ）', [[2637,0,.09,'square',.5],[2093,.1,.09,'square',.5],[2637,.2,.09,'square',.5],[2093,.3,.09,'square',.5],[2637,.4,.09,'square',.5],[3136,.5,.4,'square',.5],
+                                         [2637,1.0,.09,'square',.5],[2093,1.1,.09,'square',.5],[2637,1.2,.09,'square',.5],[2093,1.3,.09,'square',.5],[2637,1.4,.09,'square',.5],[3136,1.5,.5,'square',.5]]],
     chime:  ['ピンポーン',     [[1319,0,.18,'sine',.5],[1047,.2,.45,'sine',.5]]],
     pi:     ['ピッ',           [[2000,0,.12,'sine',.5]]],
     pipi:   ['ピピッ',         [[2000,0,.08,'sine',.5],[2000,.12,.08,'sine',.5]]],
@@ -357,7 +361,7 @@ const SOUNDS = {
     none:   ['音なし',         []]
   }
 };
-const SND_DEFAULT = { ok:'chime', ng:'buzz', read:'pi' };
+const SND_DEFAULT = { ok:'chiro', ng:'buzz', read:'pi' };
 function sndPick(kind, preview){
   const id = {ok:'cfgOk', ng:'cfgNg', read:'cfgRd'}[kind];
   const v = preview ? document.getElementById(id).value : (cfg['snd_'+kind] || SND_DEFAULT[kind]);
