@@ -261,7 +261,7 @@ h2{font-size:16px;margin:4px 0 10px}
       <h2>データ管理</h2>
       <div class="row">
         <button class="btn red" onclick="resetEdaban()">読取済みかんばんをリセット</button>
-        <button class="btn red" onclick="resetLog()">全期間の記録を消去</button>
+        <button class="btn red" onclick="resetLog()">全期間の記録を消去（読取済みかんばんも）</button>
       </div>
       <p class="hint">客先かんばんのQRの中身（全文字）がまったく同じものを「同じかんばん」としてエラーにします。枝番の位置を調べる必要はありません。便や日付が変わってリセットが必要なときに使ってください。</p>
     </div>
@@ -828,10 +828,14 @@ function saveSettings(){
 }
 function resetEdaban(){ if(confirm('読取済みかんばんの記録をすべて消去します。よろしいですか？')){ readC={}; LS.set('readC',readC); renderSteps(); alert('リセットしました'); } }
 async function resetLog(){
-  if(!confirm('全期間の照合記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
+  if(!confirm('全期間の照合記録と、読取済みかんばんの記録を消去します。先に「全期間のCSV」を保存しましたか？')) return;
   if(!confirm('本当に消去しますか？元に戻せません。')) return;
   if(dbh) await dbClear();
+  // 記録を消したら、重複判定に使う「読取済みかんばん」とNG後の再照合待ちも一緒にリセットする
+  readC = {}; LS.set('readC', readC);
+  recheck = null; LS.set('recheck', null); cur = null;
   todayStat = {ok:0, ng:0}; dayLogs = []; await refreshDays(); renderLog(); renderSteps();
+  alert('全期間の記録と読取済みかんばんを消去しました');
 }
 
 /* ---------- 抜き取り位置（事前設定・パスワード不要） ---------- */
