@@ -100,13 +100,6 @@ h2{font-size:16px;margin:4px 0 10px}
 <main>
   <!-- 照合画面 -->
   <section id="viewMain">
-    <div class="card hidden" id="sendBanner" style="background:#fef3c7;border:2px solid #f59e0b">
-      <div style="font-weight:700;font-size:16px">🌐 オンラインです。未送信の記録が <span id="bnCnt">0</span>件あります</div>
-      <div class="row" style="margin-top:8px">
-        <button class="btn" style="flex:1;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 Googleドライブへ送る</button>
-        <button class="btn gray" onclick="document.getElementById('sendBanner').classList.add('hidden')">あとで</button>
-      </div>
-    </div>
     <div class="card">
       <div class="modes">
         <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
@@ -633,8 +626,6 @@ async function refreshSendState(){
   document.getElementById('unsentTxt').innerHTML = un.length
     ? `<span style="color:#b45309">未送信 ${un.length}件</span>（通し番号 ${un[0].no}～${un[un.length-1].no}）`
     : `<span style="color:#16a34a">すべて送信済み</span>${lastSentNo ? `（通し番号 ${lastSentNo} まで）` : ''}`;
-  document.getElementById('bnCnt').textContent = un.length;
-  if(!(navigator.onLine && un.length)) document.getElementById('sendBanner').classList.add('hidden');
   return {count: un.length};
 }
 function csvOf(list){
@@ -652,22 +643,27 @@ async function sendToDrive(){
   const upto = list[list.length-1].no;
   const name = `${devTag()}_誤品照合_${stamp()}.csv`;
   const files = [new File([csvOf(list)], name, {type:'text/csv'})];
-  let done = false;
-  if(navigator.canShare && navigator.canShare({files})){
-    try{ await navigator.share({files, title:name}); done = true; }
-    catch(e){ if(e && e.name==='AbortError') return; }
-  }
-  if(!done){ const a=document.createElement('a'); a.href=URL.createObjectURL(files[0]); a.download=name; a.click(); }
-  if(confirm(`「${name}」（${list.length}件・通し番号 ${list[0].no}～${upto}）をGoogleドライブに保存できましたか？\n「OK」で送信済みにします。`)){
+  const markSent = () => {
     lastSentNo = upto; LS.set('lastSentNo', lastSentNo);
     LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name, from:list[0].no, to:upto, n:list.length}]).slice(-500));
     refreshSendState();
+    alert(`送信済みにしました（${list.length}件・通し番号 ${list[0].no}～${upto}）。未送信は0件です。`);
+  };
+  if(navigator.canShare && navigator.canShare({files})){
+    try{
+      await navigator.share({files, title:name});
+      markSent();                       // 共有（送信）が完了したら、そのまま送信済みにする
+    }catch(e){
+      // Androidでは送信できていても「中断」扱いで戻ることがあるため、確認して送信済みにする
+      if(confirm(`「${name}」をGoogleドライブに保存できましたか？\n「OK」で送信済みにします（未送信が0件になります）。\n保存していない場合は「キャンセル」を押してください。`)) markSent();
+    }
+    return;
   }
+  // 共有が使えない端末：CSVを端末に保存して送信済みにする
+  const a=document.createElement('a'); a.href=URL.createObjectURL(files[0]); a.download=name; a.click();
+  markSent();
 }
-window.addEventListener('online', async ()=>{
-  const {count} = await refreshSendState();
-  if(count) document.getElementById('sendBanner').classList.remove('hidden');
-});
+window.addEventListener('online', ()=>{ refreshSendState(); });
 
 async function initRecords(){
   try{
@@ -685,8 +681,7 @@ async function initRecords(){
     dayLogs = t.reverse();
   }catch(e){ alert('記録用の保存領域を開けませんでした：' + e); }
   await refreshDays(); renderLog(); renderSteps();
-  const {count} = await refreshSendState();
-  if(navigator.onLine && count) document.getElementById('sendBanner').classList.remove('hidden');
+  await refreshSendState();
 }
 
 /* ---------- 入力（スキャナー／カメラ） ---------- */
