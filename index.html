@@ -327,9 +327,10 @@ function audioUnlock(){
   }catch(e){}
 }
 ['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev, audioUnlock, {passive:true}));
-function tone(freq, start, dur, type, vol){
+function tone(freq, start, dur, type, vol, fEnd){
   const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + start;
-  o.type = type; o.frequency.value = freq;
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if(fEnd) o.frequency.exponentialRampToValueAtTime(fEnd, t0 + dur);   // 音程を滑らせる（キュイーン）
   g.gain.setValueAtTime(0.0001, t0);
   g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
   g.gain.setValueAtTime(vol, t0 + dur - 0.05);
@@ -337,9 +338,17 @@ function tone(freq, start, dur, type, vol){
   o.connect(g); g.connect(actx.destination);
   o.start(t0); o.stop(t0 + dur + 0.02);
 }
-// 選べる音（[周波数, 開始秒, 長さ秒, 波形, 音量]）
+// 選べる音（[周波数, 開始秒, 長さ秒, 波形, 音量, 終わりの周波数（音程を滑らせるときだけ）]）
 const SOUNDS = {
   ok: {
+    // パチンコ台風：音程が一気に駆け上がる「キュイーン」と、当たり確定のファンファーレ
+    kyuin:   ['キュイーン×2（パチンコ風）', [[500,0,.42,'sawtooth',.35,3200],[505,0,.42,'square',.25,3230],[3200,.42,.08,'square',.4],
+                                          [500,.55,.42,'sawtooth',.35,3200],[505,.55,.42,'square',.25,3230],[3200,.97,.2,'square',.4]]],
+    kakutei: ['当たり確定音（ファンファーレ）', [[1047,0,.08,'square',.45],[1319,.08,.08,'square',.45],[1568,.16,.08,'square',.45],[2093,.24,.08,'square',.45],
+                                          [1568,.36,.06,'square',.4],[2093,.42,.6,'square',.4],[2637,.42,.6,'square',.3],[3136,.42,.6,'triangle',.4]]],
+    kyuinkakutei: ['キュイーン→当たり確定（約1.6秒）', [[500,0,.42,'sawtooth',.35,3200],[505,0,.42,'square',.25,3230],[3200,.42,.06,'square',.4],
+                                          [1047,.55,.07,'square',.45],[1319,.62,.07,'square',.45],[1568,.69,.07,'square',.45],[2093,.76,.07,'square',.45],
+                                          [2093,.86,.7,'square',.4],[2637,.86,.7,'square',.3],[3136,.86,.7,'triangle',.4]]],
     // 騒音の多い工場向け：聞き取りやすい2～3kHz帯の矩形波で約1秒鳴らす
     chiro:  ['チロリロリン（約1秒・工場向け）', [[2637,0,.09,'square',.5],[2093,.1,.09,'square',.5],[2637,.2,.09,'square',.5],[2093,.3,.09,'square',.5],[2637,.4,.09,'square',.5],[3136,.5,.5,'square',.5]]],
     chiro2: ['チロリロリン×2（約2秒・さらに目立つ）', [[2637,0,.09,'square',.5],[2093,.1,.09,'square',.5],[2637,.2,.09,'square',.5],[2093,.3,.09,'square',.5],[2637,.4,.09,'square',.5],[3136,.5,.4,'square',.5],
@@ -375,7 +384,7 @@ function sound(kind, preview){
     audioUnlock();
     if(actx){
       const vol = Number(preview ? document.getElementById('cfgVol').value : (cfg.vol || 0.7));
-      sndPick(kind, preview).forEach(([f,s,d,w,v]) => tone(f, s, d, w, Math.max(0.001, v*vol*1.4)));
+      sndPick(kind, preview).forEach(([f,s,d,w,v,fe]) => tone(f, s, d, w, Math.max(0.001, v*vol*1.4), fe));
     }
   }catch(e){}
   try{
