@@ -213,8 +213,8 @@ h2{font-size:16px;margin:4px 0 10px}
 
     <div class="card">
       <h2>端末番号</h2>
-      <div class="row"><label>この端末の番号</label><input id="cfgDev" inputmode="numeric" maxlength="3" placeholder="例：01"></div>
-      <p class="hint">タブレット・スマホごとに違う番号（01、02、03…）を付けてください。CSVのファイル名の頭と、各記録に入ります。</p>
+      <div class="row"><label>この端末の番号・名前</label><input id="cfgDev" maxlength="12" placeholder="例：01、A1、やまだ、出荷1"></div>
+      <p class="hint">タブレット・スマホごとに違う番号または名前（数字・英字・かな・漢字、12文字まで）を付けてください。CSVのファイル名の頭と、各記録に入ります。空白と記号 \ / : * ? " &lt; &gt; | は使えません（ファイル名に使えないため自動で取り除きます）。</p>
     </div>
 
     <div class="card">
@@ -479,8 +479,9 @@ function lock(title, detail){
   setTimeout(()=>document.getElementById('lockPw').focus(), 100);
 }
 function tryUnlock(){
-  const v = document.getElementById('lockPw').value;
-  if(v === String(cfg.pw)){
+  // 全角数字や前後の空白が入っても、番号として正しく比べる
+  const v = toHalf(document.getElementById('lockPw').value).trim();
+  if(v === toHalf(String(cfg.pw)).trim()){
     locked = false; clearInterval(lock.t); LS.set('lockState', null);
     document.getElementById('lock').classList.remove('show');
     if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); }   // NGの客先かんばんはそのまま。正規の社内かんばんを待つ
@@ -623,9 +624,11 @@ async function exportCsv(scope){
 
 /* ---------- Googleドライブへの送信（オンライン時にまとめて） ---------- */
 let lastSentNo = LS.get('lastSentNo', 0);   // ここまでの通し番号は送信済み
-function devTag(){ return '端末' + (cfg.dev || '未設定'); }
+// 数字だけなら「端末01」、名前なら「やまだ」のように表示・ファイル名に使う
+function devLabel(){ const d = cfg.dev || ''; return !d ? '' : (/^[0-9]+$/.test(d) ? '端末' + d : d); }
+function devTag(){ return devLabel() || '端末未設定'; }
 function stamp(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
-function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? '端末'+cfg.dev : '端末番号未設定'; b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
+function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? devLabel() : '端末番号未設定'; b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
 async function unsentList(){
   const all = dbh ? await dbAll() : [];
   return all.filter(l => (l.no||0) > lastSentNo).sort((a,b)=> a.no - b.no);
@@ -792,7 +795,7 @@ function stopCamera(){ if(qr){ qr.stop().catch(()=>{}).finally(()=>{ qr=null; })
 function askPw(){
   const v = prompt('解除番号を入力してください');
   if(v===null) return false;
-  if(v===String(cfg.pw)) return true;
+  if(toHalf(v).trim()===toHalf(String(cfg.pw)).trim()) return true;
   alert('番号が違います'); return false;
 }
 function openSettings(){
@@ -821,8 +824,9 @@ function saveSettings(){
   cfg.cmp=g('cfgCmp');
   cfg.snd_ok=g('cfgOk'); cfg.snd_ng=g('cfgNg'); cfg.snd_read=g('cfgRd'); cfg.vol=g('cfgVol'); cfg.vib=g('cfgVib');
   cfg.saveMode=g('cfgSave'); cfg.dayReset=g('cfgDayReset');
-  const dv = g('cfgDev').trim().replace(/[^0-9A-Za-z]/g,'');
-  if(!dv){ alert('端末番号を入力してください（例：01）'); return; }
+  // 全角英数は半角に。空白・ファイル名に使えない記号・制御文字は取り除く（かな・漢字はそのまま）
+  const dv = toHalf(g('cfgDev')).replace(/[\s\\\/:*?"<>|\u0000-\u001f]/g,'').slice(0,12);
+  if(!dv){ alert('端末番号または名前を入力してください（例：01、A1、やまだ）'); return; }
   cfg.dev = /^\d$/.test(dv) ? '0'+dv : dv; renderDev();
   const pw = g('cfgPw').trim();
   if(pw){ if(pw.length<4){ alert('番号は4桁以上にしてください'); return; } cfg.pw = pw; }
