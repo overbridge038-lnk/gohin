@@ -422,7 +422,7 @@ function onScan(raw){
       applyMakerPos(det.m); makerName = det.m.name;
     }else if(det.state !== 'off'){
       const why = det.state==='unknown' ? '登録したどのメーカーの見本にも似ていません（未登録のかんばんの可能性）'
-                                        : `「${det.names.join('」「')}」のどちらか判別できません`;
+                                        : `「${det.names.join('」「')}」のどちらか判別できません（両方のメーカーに違う品番の見本を5件以上登録すると見分けられます）`;
       if(cfg.detFail !== 'manual'){
         return fail('メーカーを判定できません', why + '。担当者が見本QRを登録してください', {hin:'', kind:'メーカー判定不可', raw});
       }
@@ -930,7 +930,19 @@ function renderSampleInfo(i){
   const g = id => { const e = document.getElementById(id+i); return e ? Number(e.value) : 0; };
   const cS=g('mkCS'), cE=g('mkCE'), iS=g('mkIS'), iE=g('mkIE');
   const n = (m.samples||[]).length, last = n ? m.samples[n-1] : '';
-  let h = `見本QR：<b>${n}</b>件` + (n && n<3 ? '　<span style="color:#b45309">（3件以上、違う品番のかんばんで登録すると判定が確実になります）</span>' : '');
+  // 形式がよく似た別メーカー（見本どうしが5割以上一致）を探し、見分けに使う場所を表示する
+  const similar = mkWork.filter((o,j) => j!==i && (o.samples||[]).length && n &&
+    Math.max(...o.samples.map(x=>qrSim(last, x))) >= 0.5);
+  const need = similar.length ? 5 : 3;
+  let h = `見本QR：<b>${n}</b>件` + (n && n<need ? `　<span style="color:#b45309">（${need}件以上、違う品番のかんばんで登録すると判定が確実になります）</span>` : '');
+  similar.forEach(o => {
+    const kp = keyPositions(m, o);
+    h += kp.length > 30
+      ? `<br>「${esc(o.name)}」と形式が似ています → 見本が少なく、見分ける場所がまだ絞れていません。両方に違う品番の見本を追加してください。`
+      : kp.length
+      ? `<br>「${esc(o.name)}」と形式が似ています → 見分ける場所：<b>${esc(rangeText(kp))}</b>文字目`
+      : `<br><span style="color:#b91c1c">「${esc(o.name)}」と形式が似ていて、見分ける場所がまだ見つかりません。両方のメーカーに違う品番の見本を追加してください。</span>`;
+  });
   if(last && cS>=1 && cE>=cS) h += `<br>客先の抜き取り → 「<b>${esc([...last].slice(cS-1,cE).join(''))}</b>」`;
   if(m.iSample && iS>=1 && iE>=iS) h += `<br>社内の抜き取り → 「<b>${esc([...m.iSample].slice(iS-1,iE).join(''))}</b>」`;
   if(capture && capture.i===i){
@@ -951,9 +963,41 @@ function detectMaker(raw){
   const sc = list.map(m => ({m, s: Math.max(...m.samples.map(x=>qrSim(raw, x)))})).sort((a,b)=>b.s-a.s);
   const best = sc[0], second = sc[1];
   if(best.s < 0.5) return {state:'unknown'};
-  const samePos = second && ['cS','cE','iS','iE'].every(k => second.m[k]==best.m[k]);
-  if(second && best.s - second.s < 0.05 && !samePos) return {state:'ambiguous', names:[best.m.name, second.m.name]};
-  return {state:'ok', m:best.m, score:best.s};
+  if(!second || best.s - second.s >= 0.15) return {state:'ok', m:best.m, score:best.s};
+  const samePos = ['cS','cE','iS','iE'].every(k => second.m[k]==best.m[k]);
+  if(samePos) return {state:'ok', m:best.m, score:best.s};        // 抜き取り位置が同じなら、どちらでも照合結果は同じ
+  // 形式がよく似たメーカー（例：トヨタと豊鉄）は、2社の見本で「必ず違う文字になる場所」（納入先・仕入先コードなど）で見分ける
+  const pick = keyPosPick(raw, best.m, second.m);
+  if(pick) return {state:'ok', m:pick, score:best.s, byKey:true};
+  return {state:'ambiguous', names:[best.m.name, second.m.name]};
+}
+function rangeText(nums){   // [11,12,13,14,20] → "11〜14、20"
+  const out = []; let s = null, p = null;
+  nums.forEach(n => { if(s===null){ s=p=n; } else if(n===p+1){ p=n; } else { out.push(s===p?`${s}`:`${s}〜${p}`); s=p=n; } });
+  if(s!==null) out.push(s===p?`${s}`:`${s}〜${p}`);
+  return out.join('、');
+}
+// 見本のうち、全件で同じ文字になっている場所 → {位置: 文字}
+function fixedChars(samples){
+  const n = Math.min(...samples.map(s=>s.length)), out = {};
+  for(let i=0;i<n;i++){ const c = samples[0][i]; if(samples.every(s=>s[i]===c)) out[i] = c; }
+  return out;
+}
+function keyPosPick(raw, A, B){
+  const fa = fixedChars(A.samples), fb = fixedChars(B.samples);
+  const disc = Object.keys(fa).filter(i => i in fb && fa[i] !== fb[i]).map(Number);
+  if(!disc.length) return null;
+  let a = 0, b = 0;
+  disc.forEach(i => { if(raw[i]===fa[i]) a++; if(raw[i]===fb[i]) b++; });
+  if(a - b >= disc.length * 0.3) return A;
+  if(b - a >= disc.length * 0.3) return B;
+  return null;
+}
+// 2社の見本を比べて、見分けに使える場所（文字目）を返す（設定画面の表示用）
+function keyPositions(A, B){
+  if(!(A.samples||[]).length || !(B.samples||[]).length) return [];
+  const fa = fixedChars(A.samples), fb = fixedChars(B.samples);
+  return Object.keys(fa).filter(i => i in fb && fa[i] !== fb[i]).map(i=>Number(i)+1);
 }
 function applyMakerPos(m){
   if(cfg.cPs===m.cS && cfg.cPl===m.cE-m.cS+1 && cfg.iPs===m.iS && cfg.iPl===m.iE-m.iS+1) return;
