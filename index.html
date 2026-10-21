@@ -213,7 +213,7 @@ h2{font-size:16px;margin:4px 0 10px}
           <option value="hin">品番だけ</option>
           <option value="seb">背番号だけ</option>
         </select></div>
-      <p class="hint">社内かんばんのQRが「AAA,品番,背番号,数量」（例：AAA,12345-6890,ABCD,10）の形なら、品番と背番号をそこから取り出します。この形でないときは「5桁-5桁」の品番だけで照合します。背番号は4文字ほどと短く、客先QRの別の部分と偶然一致することがあるため、「背番号だけ」より「両方」をおすすめします。</p>
+      <p class="hint">社内かんばんのQRが「AAA,品番,背番号,数量」（例：AAA,12345-6890,ABCD,10）の形なら、品番と背番号をそこから取り出します。背番号がない社内かんばん（背番号の欄が空、または「AAA,品番,数量」の形）や、この形でないとき（「5桁-5桁」「5桁-4桁」の品番を探します）は、どの設定でも品番で照合します。背番号は4文字ほどと短く、客先QRの別の部分と偶然一致することがあるため、「背番号だけ」より「両方」をおすすめします。</p>
       <div class="row"><label>品番の比較（従来の方法のとき）</label>
         <select id="cfgCmp">
           <option value="full">全桁一致</option>
@@ -335,7 +335,7 @@ function hyph(s){ return String(s||'').replace(/[‐－―ー−–—]/g,'-'); 
 // 社内かんばんのQRから「5桁-5桁」の品番を取り出す（全角・いろいろなハイフンも可）
 function innerPart(raw){
   const t = hyph(toHalf(String(raw||''))).toUpperCase();
-  const m = t.match(/([0-9A-Z]{5})\s*-\s*([0-9A-Z]{5})/);
+  const m = t.match(/([0-9A-Z]{5})\s*-\s*([0-9A-Z]{4,5})/);
   return m ? m[1] + '-' + m[2] : '';
 }
 // 社内かんばんQRから品番・背番号・数量を取り出す。「AAA,品番,背番号,数量」の形を優先、なければ「5桁-5桁」の品番だけ
@@ -343,13 +343,17 @@ function sebMode(){ return ['hin','seb'].includes(cfg.seb) ? cfg.seb : 'both'; }
 function innerFields(raw){
   const t = hyph(toHalf(String(raw||''))).replace(/[、，]/g, ',');
   const f = t.split(',').map(x => x.trim());
-  if(f.length >= 3 && norm(f[1]) && norm(f[2])) return {hin:f[1].toUpperCase(), seb:f[2].toUpperCase(), qty:f[3]||'', csv:true};
+  if(f.length >= 3 && norm(f[1])){
+    // 背番号の欄が空（AAA,品番,,数量）や、背番号の欄そのものがない（AAA,品番,数量）ときは背番号なし
+    const noSeb = !norm(f[2]) || (f.length === 3 && /^\d+$/.test(f[2]));
+    return {hin:f[1].toUpperCase(), seb: noSeb ? '' : f[2].toUpperCase(), qty: noSeb && f.length === 3 ? f[2] : (f[3]||''), csv:true};
+  }
   return {hin:innerPart(raw), seb:'', qty:'', csv:false};
 }
 // 社内かんばんの形（AAA,品番,背番号,数量）か。①で読まれたときの読み順ズレ検出用
 function looksInner(raw){
   const f = hyph(toHalf(String(raw||''))).replace(/[、，]/g, ',').split(',').map(x=>x.trim());
-  return f.length === 4 && /^[0-9A-Z]{5}-[0-9A-Z]{4,5}$/i.test(f[1]) && !!f[2] && /^\d+$/.test(f[3]);
+  return (f.length === 4 || f.length === 3) && /^[0-9A-Z]{5}-[0-9A-Z]{4,5}$/i.test(f[1]) && /^\d+$/.test(f[f.length-1]);
 }
 // norm() と同じ変換をしつつ、変換後の1文字が元の何文字目かを覚えておく（どこに見つかったかを示すため）
 function normMap(s){
@@ -537,10 +541,7 @@ function onScan(raw){
       // 入っていればOK：社内かんばんの「5桁-5桁」の品番が、客先かんばんのQR全文の中にあるか探す
       lastRaw.i = raw; LS.set('lastRaw', lastRaw);
       const fi = innerFields(raw), mode = sebMode(), sebTxt = fi.seb ? `背番号「${fi.seb}」` : '';
-      const useHin = mode !== 'seb', useSeb = mode !== 'hin' && !!fi.seb;
-      if(mode === 'seb' && !fi.seb){
-        return fail('社内かんばんの背番号が見つかりません', `社内かんばんのQRが「AAA,品番,背番号,数量」の形ではありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'背番号なし', raw:cur.raw});
-      }
+      const useSeb = mode !== 'hin' && !!fi.seb, useHin = mode !== 'seb' || !fi.seb;   // 背番号がない社内かんばんは品番で照合
       if(useHin && !fi.hin){
         return fail('社内かんばんの品番が見つかりません', `社内かんばんのQRに品番がありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'社内品番なし', raw:cur.raw});
       }
@@ -556,7 +557,7 @@ function onScan(raw){
         readC[cur.key] = now(); LS.set('readC', readC);
         addLog(cur.hin, inner, 'OK', cur.raw, [
           hHit ? `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致` : '',
-          sHit ? `背番号${fi.seb}：客先QRの${sHit.pos}～${sHit.end}文字目に一致` : (fi.seb ? `背番号${fi.seb}（照合なし）` : ''),
+          sHit ? `背番号${fi.seb}：客先QRの${sHit.pos}～${sHit.end}文字目に一致` : (fi.seb ? `背番号${fi.seb}（照合なし）` : (mode !== 'hin' ? '社内かんばんに背番号なし→品番で照合' : '')),
           cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
         showOk(fi.seb ? `背番号 ${fi.seb}` : '');
         cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
