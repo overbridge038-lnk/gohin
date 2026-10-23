@@ -313,7 +313,26 @@ const LS = {
 const DEFAULT_CFG = { cPs:1, cPl:300, iPs:1, iPl:300, cmp:'full', pw:'0000', mode:'scanner' };
 let cfg = Object.assign({}, DEFAULT_CFG, LS.get('cfg', {}));
 if(!(cfg.cPl>0)) cfg.cPl = 300; if(!(cfg.iPl>0)) cfg.iPl = 300;   // 旧設定（0=最後まで）からの移行
-let readC = LS.get('readC', {});        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
+let readC = LS.get('readC', {});
+/* 客先QRの文字数を覚える（照合OKになったもの）。いつもより短いQRは「頭が欠けた読取」として受け付けない */
+let cLens = LS.get('cLens', null);
+if(!cLens){ cLens = {}; Object.keys(readC).forEach(k => { const L = [...k.trim()].length; cLens[L] = (cLens[L]||0) + 1; }); LS.set('cLens', cLens); }
+let shortOnce = '';   // 短いQRを1回目は受け付けず、同じ内容をもう一度読んだら新しい形として受け付ける
+// 読取済みか。頭が欠けて記録された古い読取とも突き合わせる（片方がもう片方の後ろ部分と同じなら同じかんばん）
+function seenAt(key){
+  if(readC[key]) return readC[key];
+  if([...key].length < 20) return '';
+  for(const k in readC){ if(k.length >= 20 && (k.endsWith(key) || key.endsWith(k))) return readC[k]; }
+  return '';
+}
+function learnLen(raw){ const L = [...String(raw).trim()].length; if(!L) return; cLens[L] = (cLens[L]||0) + 1; LS.set('cLens', cLens); }
+function looksCut(raw){
+  const L = [...raw.trim()].length;
+  const known = Object.keys(cLens).filter(k => cLens[k] >= 3).map(Number);
+  if(!known.length || known.includes(L)) return 0;
+  const longer = known.filter(k => k > L);
+  return longer.length ? Math.min(...longer) : 0;   // いつもの文字数（これより短い＝頭が欠けた）
+}        // { 客先QR全文: 読取日時 }  照合OKになった客先かんばん
 let dayLogs = [];                      // 表示中の日付の記録
 let todayStat = {ok:0, ng:0};          // 今日のOK/NG数
 let cur = null;                         // 読取中の客先かんばん
@@ -494,6 +513,7 @@ function onScan(raw){
   raw = String(raw||'').replace(/[\r\n]+$/,'');
   if(capture && raw){ takeSample(raw); return; }        // 設定画面で見本QRを読み取り中
   if(!raw || locked) return;
+  keepAwake();
   const tNow = Date.now();
   if(raw === lastScan.v && tNow - lastScan.t < 1200) return;   // スキャナー・入力の二重送信は無視
   lastScan = {v:raw, t:tNow};
@@ -503,13 +523,24 @@ function onScan(raw){
     if(recheck && key === recheck.key){                // NGになった客先かんばんの読み直し → 再照合として受け付ける（重複にしない）
       cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
     }
+    if(!(howMode() === 'contain' && looksInner(raw))){
+      const usual = looksCut(raw);
+      if(usual && shortOnce !== key){
+        shortOnce = key;
+        imeWarn(`読み取りが途中からになっています（${[...key].length}文字／いつもは${usual}文字）。もう一度、客先かんばんを読み取ってください`);
+        sound('ng'); return;
+      }
+      // 同じ短いQRを2回続けて読めた → 頭の欠けではなく、この文字数の客先かんばんとして覚える
+      if(usual){ const L = [...key].length; cLens[L] = Math.max(cLens[L]||0, 3); LS.set('cLens', cLens); }
+      shortOnce = '';
+    }
     if(howMode() === 'contain' && looksInner(raw)){
       // 社内かんばんを①で読んだ（読み順のズレ）。ロックせず案内し、ズレが続かないよう①のまま待つ
       imeWarn('これは社内かんばんです。① 客先かんばんから読んでください'); sound('ng'); return;
     }
     if(howMode() === 'contain'){
       // 入っていればOK：客先はQR全文を使うので、メーカー判定・抜き取りはしない
-      if(readC[key]) return fail('同じ客先かんばんを2回読み取りました', `前回の読取：${readC[key]}`, {hin:'', kind:'かんばん重複', raw});
+      if(seenAt(key)) return fail('同じ客先かんばんを2回読み取りました', `前回の読取：${seenAt(key)}`, {hin:'', kind:'かんばん重複', raw});
       cur = { raw, hin:'', key, maker:'', makerNote:'', whole:true }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
       renderSteps(); sound('read'); return;
     }
@@ -528,8 +559,8 @@ function onScan(raw){
     }
     const hin = cut(raw, cfg.cPs, cfg.cPl);
     if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
-    if(readC[key]){
-      return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${readC[key]}`, {hin, inner:'', kind:'かんばん重複'});
+    if(seenAt(key)){
+      return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${seenAt(key)}`, {hin, inner:'', kind:'かんばん重複'});
     }
     cur = { raw, hin, key, maker:makerName, makerNote }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
     renderSteps();
@@ -679,6 +710,7 @@ const dbDays = ()  => dbTx('readonly', (st, set) => {
 
 function addLog(hin, inner, r, raw, note){
   const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo(), note:note||''};
+  if(r === 'OK' && raw) learnLen(raw);
   if(rec.day !== today) rollDay();
   if(r==='OK') todayStat.ok++; else todayStat.ng++;
   if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
@@ -1211,8 +1243,18 @@ function savePos(){
 }
 
 /* ---------- 起動 ---------- */
+/* ---------- 画面を消さない（スリープ中にスキャンすると、画面が点く間にQRの頭の文字が消えるため） ---------- */
+let wakeLock = null;
+async function keepAwake(){
+  try{
+    if(!('wakeLock' in navigator) || document.visibilityState !== 'visible' || wakeLock) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  }catch(e){ wakeLock = null; }
+}
+document.addEventListener('visibilitychange', keepAwake);
 function startWork(){
-  audioUnlock(); sound('read');
+  audioUnlock(); sound('read'); keepAwake();
   document.getElementById('startCover').classList.add('hidden');
   setMode(cfg.mode);
 }
