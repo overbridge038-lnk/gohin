@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-4</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-5</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -406,6 +406,15 @@ function looksInner(raw){
   const f = hyph(toHalf(String(raw||''))).replace(/[、，]/g, ',').split(',').map(x=>x.trim());
   return (f.length === 4 || f.length === 3) && /^[0-9A-Z]{5}-[0-9A-Z]{4,5}$/i.test(f[1]) && /^\d+$/.test(f[f.length-1]);
 }
+// 客先かんばんか。②で客先かんばんを読んでしまうと、自分自身と照合してOKになってしまうので、②では受け付けない
+function looksCustomer(raw, curRaw){
+  const t = String(raw||'').trim();
+  if(!t || looksInner(raw)) return false;
+  if(curRaw && t === String(curRaw).trim()) return true;           // ①と同じかんばん
+  if(seenAt(t)) return true;                                       // 照合OKになったことのある客先かんばん
+  if(/^(\]\(>|\[\)>|JT\d)/.test(t)) return true;                    // 客先QRの先頭（スキャナーが付ける記号／「JT」形式）
+  return (cLens[[...t].length] || 0) >= 3;                         // いつもの客先QRの文字数
+}
 // norm() と同じ変換をしつつ、変換後の1文字が元の何文字目かを覚えておく（どこに見つかったかを示すため）
 function normMap(s){
   let out = '', map = [];
@@ -603,6 +612,7 @@ function onScan(raw){
   }else{
     // ② 社内かんばん
     if(cur.recheck && raw.trim() === cur.key){ sound('read'); return; }   // 再照合中に同じ客先かんばんを読み直しても、そのまま②を待つ
+    if(looksCustomer(raw, cur.raw)){ imeWarn('これは客先かんばんです。② 社内かんばんを読み取ってください'); sound('ng'); return; }   // ロックはせず、②のまま待つ
     if(cur.whole){
       // 入っていればOK：社内かんばんの「5桁-5桁」の品番が、客先かんばんのQR全文の中にあるか探す
       lastRaw.i = raw; LS.set('lastRaw', lastRaw);
