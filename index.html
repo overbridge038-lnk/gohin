@@ -183,8 +183,9 @@ h2{font-size:16px;margin:4px 0 10px}
         <button class="btn" style="width:100%;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 未送信分をGoogleドライブへ送る</button>
         <p class="hint">前回送った後の新しい記録だけを1つのファイルにして送ります（追加方式・上書きなし）。ファイル名は「端末番号_誤品照合_日付_時刻.csv」なので、複数台・何回送っても名前が重なりません。オンラインにしてから押し、共有先で「ドライブ」を選んでください。</p>
       </div>
+      <div id="gapBox"></div>
       <div style="max-height:300px;overflow:auto">
-        <table><thead><tr><th>時刻</th><th>客先品番</th><th>社内品番</th><th>結果</th></tr></thead>
+        <table><thead><tr><th>時刻</th><th>客先品番</th><th>社内品番</th><th>枝番</th><th>結果</th></tr></thead>
         <tbody id="logBody"></tbody></table>
       </div>
     </div>
@@ -325,6 +326,9 @@ function seenAt(key){
   for(const k in readC){ if(k.length >= 20 && (k.endsWith(key) || key.endsWith(k))) return readC[k]; }
   return '';
 }
+// 客先QR全文から、かんばん枚数の枝番（「K」と「Z」の間の数字。例：…P017K34Z… → 34）を取り出す。なければ空
+function edaOf(raw){ const m = String(raw||'').match(/K(\d+)Z/); return m ? String(+m[1]) : ''; }
+function edaTxt(raw){ const e = edaOf(raw); return e ? `枝番 ${e}　／　` : ''; }
 function learnLen(raw){ const L = [...String(raw).trim()].length; if(!L) return; cLens[L] = (cLens[L]||0) + 1; LS.set('cLens', cLens); }
 function looksCut(raw){
   const L = [...raw.trim()].length;
@@ -540,7 +544,7 @@ function onScan(raw){
     }
     if(howMode() === 'contain'){
       // 入っていればOK：客先はQR全文を使うので、メーカー判定・抜き取りはしない
-      if(seenAt(key)) return fail('同じ客先かんばんを2回読み取りました', `前回の読取：${seenAt(key)}`, {hin:'', kind:'かんばん重複', raw});
+      if(seenAt(key)) return fail('同じ客先かんばんを2回読み取りました', `${edaTxt(raw)}前回の読取：${seenAt(key)}`, {hin:'', kind:'かんばん重複', raw});
       cur = { raw, hin:'', key, maker:'', makerNote:'', whole:true }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
       renderSteps(); sound('read'); return;
     }
@@ -560,7 +564,7 @@ function onScan(raw){
     const hin = cut(raw, cfg.cPs, cfg.cPl);
     if(!norm(hin)){ return fail('客先かんばんの品番が読み取れません', raw, {hin}); }
     if(seenAt(key)){
-      return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　前回の読取：${seenAt(key)}`, {hin, inner:'', kind:'かんばん重複'});
+      return fail('同じ客先かんばんを2回読み取りました', `品番 ${hin}　／　${edaTxt(raw)}前回の読取：${seenAt(key)}`, {hin, inner:'', kind:'かんばん重複', raw});
     }
     cur = { raw, hin, key, maker:makerName, makerNote }; lastRaw.c = raw; LS.set('lastRaw', lastRaw);
     renderSteps();
@@ -709,7 +713,7 @@ const dbDays = ()  => dbTx('readonly', (st, set) => {
 });
 
 function addLog(hin, inner, r, raw, note){
-  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo(), note:note||''};
+  const rec = {day:dayKey(), t:now(), hin, inner, r, raw:raw||'', dev:cfg.dev||'', no:nextNo(), note:note||'', eda:edaOf(raw)};
   if(r === 'OK' && raw) learnLen(raw);
   if(rec.day !== today) rollDay();
   if(r==='OK') todayStat.ok++; else todayStat.ng++;
@@ -721,12 +725,42 @@ function addLog(hin, inner, r, raw, note){
 function renderLog(){
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="hint">この日の記録はありません</td></tr>';
+    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda ?? edaOf(l.raw))}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="hint">この日の記録はありません</td></tr>';
+  renderGaps();
   const ok = dayLogs.filter(l=>l.r==='OK').length;
   document.getElementById('daySum').innerHTML =
     `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.length-ok}</b>件` +
     (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
+}
+// 枝番の抜けチェック：OKの記録を品番ごとに古い順に見て、枝番が1から順に揃っているか調べる。
+// 同じ枝番がもう一度出たら次のロット（1から数え直し）として別に数える。読んだ最大の枝番より後ろは、まだ読んでいないだけか判断できないので対象外
+function findGaps(list){
+  const runs = {}, out = [];
+  for(const l of list.slice().reverse()){
+    const e = l.r === 'OK' ? +(l.eda ?? edaOf(l.raw)) : 0;
+    if(!e) continue;
+    const k = l.hin || l.inner || '（品番なし）', a = runs[k] = runs[k] || [];
+    let r = a[a.length-1];
+    if(!r || r.has(e)){ r = new Set(); a.push(r); }
+    r.add(e);
+  }
+  for(const k in runs) runs[k].forEach((r, i) => {
+    const max = Math.max(...r), miss = [];
+    for(let n = 1; n < max; n++) if(!r.has(n)) miss.push(n);
+    if(miss.length) out.push({hin:k, lot:i+1, lots:runs[k].length, max, miss});
+  });
+  return out;
+}
+function renderGaps(){
+  const g = findGaps(dayLogs), box = document.getElementById('gapBox');
+  const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  box.innerHTML = g.length
+    ? `<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:8px 10px;margin:8px 0">
+        <b style="color:#dc2626">⚠ 枝番の抜け（読み取っていない可能性）</b>`
+        + g.map(x => `<div style="font-size:15px;margin-top:4px">${esc(x.hin)}${x.lots>1 ? `（${x.lot}回目）` : ''}：枝番 <b>${x.miss.join('、')}</b> が未読取（${x.max}まで）</div>`).join('')
+        + `<p class="hint" style="margin:4px 0 0">枝番ごとにOKの記録があるかを調べています。読んだ最大の枝番より後ろは、まだ読んでいないだけかもしれないので表示しません。</p></div>`
+    : '';
 }
 async function refreshDays(){
   let days = dbh ? await dbDays() : [];
@@ -805,8 +839,8 @@ async function refreshSendState(){
 }
 function csvOf(list){
   const q = s => '"' + String(s).replace(/"/g,'""') + '"';
-  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文','備考']]
-    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'', l.note||'']));
+  const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文','備考','枝番']]
+    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'', l.note||'', l.eda ?? edaOf(l.raw)]));
   return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 
