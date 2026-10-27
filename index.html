@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-9</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-10</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -989,13 +989,19 @@ async function sendToDrive(){
   if(!list.length){ alert('未送信の記録はありません'); return; }
   if(!navigator.onLine && !confirm('オフラインのようです。このまま続けますか？')) return;
   const upto = list[list.length-1].no;
+  // 送るファイルには「未送信分」に加えて「今日の記録すべて」を入れる。
+  // 前の送信がDriveに届いていなくても、次に送ったときに自動で埋まる（出荷漏れチェックは同じかんばんを二重に数えない）
+  const today = dayKey();
+  const all = dbh ? await dbAll() : [];
+  const seen = new Set(list.map(l => l.no));
+  const sendList = list.concat(all.filter(l => l.day === today && !seen.has(l.no))).sort((a,b)=> (a.no||0) - (b.no||0));
   const name = `${devTag()}_誤品照合_${stamp()}.csv`;
-  const files = [new File([csvOf(list)], name, {type:'text/csv'})];
+  const files = [new File([csvOf(sendList)], name, {type:'text/csv'})];
   const markSent = () => {
     lastSentNo = upto; LS.set('lastSentNo', lastSentNo);
     LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name, from:list[0].no, to:upto, n:list.length}]).slice(-500));
     refreshSendState();
-    alert(`送信済みにしました（${list.length}件・通し番号 ${list[0].no}～${upto}）。未送信は0件です。`);
+    alert(`送信済みにしました（未送信${list.length}件・通し番号 ${list[0].no}～${upto}）。未送信は0件です。\nファイルには今日の記録も全部入れました（${sendList.length}件）。`);
   };
   if(navigator.canShare && navigator.canShare({files})){
     try{

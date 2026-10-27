@@ -3,7 +3,7 @@
 // ・オフラインのとき：端末に保存してある版で起動
 // v3の変更：カメラ読取ライブラリの保存に失敗しても、ページ本体は必ず保存する
 //           （v2は1つでも失敗すると何も保存されず、オフラインで開けなかった）
-const CACHE = 'gohin-v9';
+const CACHE = 'gohin-v10';
 const CORE = ['./', './index.html'];
 const LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
 
