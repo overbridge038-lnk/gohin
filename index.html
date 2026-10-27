@@ -188,6 +188,11 @@ h2{font-size:16px;margin:4px 0 10px}
         <button class="btn" onclick="exportCsv('day')">この日のCSVを保存</button>
         <button class="btn gray" onclick="exportCsv('all')">全期間のCSV</button>
       </div>
+      <div id="treatBox"></div>
+      <div class="row">
+        <button class="btn gray" onclick="exportCsv('day', true)">この日の異常処置記録CSV</button>
+        <button class="btn gray" onclick="exportCsv('all', true)">全期間の異常処置記録CSV</button>
+      </div>
       <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">
         <div style="font-size:15px">送信状況：<b id="unsentTxt">確認中…</b></div>
         <button class="btn" style="width:100%;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 未送信分をGoogleドライブへ送る</button>
@@ -312,6 +317,7 @@ h2{font-size:16px;margin:4px 0 10px}
   <div class="msg" id="lockDetail" style="font-size:16px"></div>
   <div id="lockSteps"></div>
   <div id="lockPwBox" style="display:none">
+    <input id="lockWho" type="text" placeholder="処置した管理者の名前" style="width:260px;font-size:20px">
     <input id="lockPw" type="password" inputmode="numeric" placeholder="解除番号（管理者）">
     <div id="lockErr"></div>
     <button onclick="tryUnlock()">解除</button>
@@ -664,7 +670,10 @@ function abandonRecheck(){
   const v = prompt('NGの再照合をやめます。管理者の解除番号を入れてください');
   if(v === null) return;
   if(toHalf(v).trim() !== toHalf(String(cfg.pw)).trim()){ alert('番号が違います'); return; }
-  addUnlockLog({kind:'', no:recheck.ngNo, raw:recheck.raw, hin:recheck.hin}, `NG 通し番号 ${recheck.ngNo} の再照合を管理者がやめた`);
+  const who = (prompt('処置した管理者の名前を入れてください', LS.get('treatName', '')) || '').trim();
+  if(!who){ alert('名前が入っていないので、やめられません'); return; }
+  LS.set('treatName', who);
+  addUnlockLog({kind:'', no:recheck.ngNo, raw:recheck.raw, hin:recheck.hin}, who, true);
   recheck = null; LS.set('recheck', null); cur = null; renderSteps(); focusInput();
 }
 
@@ -710,6 +719,7 @@ function renderLockSteps(){
 function lockStepDone(i, pick){
   if(!lockCtx || i !== lockCtx.done) return;          // 順番どおりにしか進めない
   if(pick !== undefined) lockCtx.picks[i] = pick;
+  lockCtx.times[i] = now();                              // 各項目を確認した時刻
   lockCtx.done++; lockCtx.pend = undefined; LS.set('lockState', lockState());
   if(i === 0) clearInterval(lock.t);                   // 手を止めたら警告音は止める（画面のロックはそのまま）
   renderLockSteps();
@@ -717,10 +727,13 @@ function lockStepDone(i, pick){
 function lockState(){ return {title:document.getElementById('lockTitle').textContent, detail:document.getElementById('lockDetail').textContent, ctx:lockCtx}; }
 function lock(title, detail, ctx, resume){
   locked = true;
-  lockCtx = ctx ? Object.assign({done:0, picks:[]}, ctx) : {kind:'', done:0, picks:[]};
+  lockCtx = Object.assign({kind:'', done:0, picks:[], times:[]}, ctx || {});
+  lockCtx.title = title; lockCtx.detail = detail;
+  if(!lockCtx.at) lockCtx.at = now();                  // NGが出た時刻（画面を開き直しても変わらない）
   document.getElementById('lockTitle').textContent = title;
   document.getElementById('lockDetail').textContent = detail;
   document.getElementById('lockPw').value = '';
+  document.getElementById('lockWho').value = LS.get('treatName', '');
   document.getElementById('lockErr').textContent = '';
   LS.set('lockState', lockState());
   renderLockSteps();
@@ -728,14 +741,17 @@ function lock(title, detail, ctx, resume){
   clearInterval(lock.t);
   if(!lockCtx.done){ beep(false); lock.t = setInterval(()=>beep(false), 3000); }
 }
-function unlockPicksTxt(ctx){
-  const st = stepsOf(ctx), out = [];
-  st.forEach((x, i) => { if(x.c && ctx.picks[i] !== undefined) out.push(x.c[ctx.picks[i]]); });
-  return out.length ? '：' + out.join(' / ') : '';
-}
-// 解除したことを記録に追記する（結果は「解除」。OK／NGの件数には数えない）
-function addUnlockLog(ctx, note){
-  const rec = {day:dayKey(), t:now(), hin:ctx.hin||'', inner:'', r:'解除', raw:ctx.raw||'', dev:cfg.dev||'', no:nextNo(), note, eda:edaOf(ctx.raw), nban:nbanOf(ctx.raw)};
+const KIND_NAME = {'品番不一致':'品番不一致','背番号不一致':'背番号不一致','かんばん重複':'かんばん重複'};
+// 異常処置記録を、記録に追記する（結果は「解除」。OK／NGの件数には数えない）。
+// 誰が・いつ・どの手順をどう確認して解除したかを残す
+function addUnlockLog(ctx, who, abandon){
+  const st = abandon ? [] : stepsOf(ctx);
+  const t = {ngNo:ctx.no||'', kind:abandon ? '再照合の中止' : (KIND_NAME[ctx.kind] || 'その他'), title:ctx.title||'', detail:ctx.detail||'', ngAt:ctx.at||'',
+    who, times:(ctx.times||[]).slice(), checks:st.map((x, i) => x.c && ctx.picks[i] !== undefined ? x.c[ctx.picks[i]] : ''), unlockAt:now()};
+  const hm = x => x ? x.slice(11) : '－';
+  const note = `NG 通し番号 ${t.ngNo}（${t.kind}）${abandon ? 'の再照合を管理者がやめた' : 'の解除'}／処置者：${who}` + (abandon ? '' :
+    `／発生 ${hm(t.ngAt)}／確認 ${st.map((x, i) => hm(t.times[i])).join('→')}` + (t.checks.filter(Boolean).length ? `／現物：${t.checks.filter(Boolean).join(' / ')}` : '')) + `／解除 ${hm(t.unlockAt)}`;
+  const rec = {day:dayKey(), t:t.unlockAt, hin:ctx.hin||'', inner:'', r:'解除', raw:ctx.raw||'', dev:cfg.dev||'', no:nextNo(), note, eda:edaOf(ctx.raw), nban:nbanOf(ctx.raw), treat:t};
   if(rec.day !== today) rollDay();
   if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
   if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
@@ -743,9 +759,12 @@ function addUnlockLog(ctx, note){
 function tryUnlock(){
   // 全角数字や前後の空白が入っても、番号として正しく比べる
   if(!lockCtx || lockCtx.done < stepsOf(lockCtx).length) return;   // 手順が全部終わるまで解除できない
+  const who = document.getElementById('lockWho').value.trim();
+  if(!who){ document.getElementById('lockErr').textContent = '処置した管理者の名前を入れてください'; return; }
   const v = toHalf(document.getElementById('lockPw').value).trim();
   if(v === toHalf(String(cfg.pw)).trim()){
-    addUnlockLog(lockCtx, 'NG 通し番号 ' + (lockCtx.no || '') + ' の解除（手順を全部確認' + unlockPicksTxt(lockCtx) + '）');
+    LS.set('treatName', who);
+    addUnlockLog(lockCtx, who);
     locked = false; clearInterval(lock.t); LS.set('lockState', null); lockCtx = null;
     document.getElementById('lock').classList.remove('show');
     if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); }   // NGの客先かんばんはそのまま。正規の社内かんばんを待つ
@@ -821,7 +840,22 @@ function addLog(hin, inner, r, raw, note){
   if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); if(!document.querySelector(`#daySel option[value="${rec.day}"]`)) refreshDays(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
   return rec;
 }
+// 異常処置記録（この日）：どのNGを、誰が、どの手順で処置したか
+function renderTreat(){
+  const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const list = dayLogs.filter(l => l.r === '解除' && l.treat);
+  document.getElementById('treatBox').innerHTML = list.length
+    ? `<div style="border:2px solid #b45309;border-radius:10px;padding:8px 10px;margin:8px 0"><b style="color:#b45309">異常処置記録（この日 ${list.length}件）</b>` + list.map(l => {
+        const t = l.treat, hm = x => x ? x.slice(11) : '－', st = (UNLOCK_STEPS[t.kind === '品番不一致' || t.kind === '背番号不一致' ? 'mismatch' : t.kind === 'かんばん重複' ? 'dup' : 'other']) || [];
+        return `<details style="margin-top:6px"><summary style="font-size:14px">${esc(hm(t.unlockAt))}　${esc(t.kind)}　処置者：${esc(t.who)}</summary><div class="hint" style="font-size:13px;line-height:1.6">`
+          + `NG 通し番号 ${esc(t.ngNo)}　発生 ${esc(hm(t.ngAt))}<br>${esc(t.title)}<br>`
+          + (t.kind === '再照合の中止' ? '管理者が再照合をやめた' : (t.times||[]).map((x, i) => `${i+1}. ${esc(hm(x))} 確認${t.checks[i] ? '（' + esc(t.checks[i]) + '）' : ''}`).join('<br>'))
+          + `<br>解除 ${esc(hm(t.unlockAt))}</div></details>`;
+      }).join('') + '</div>'
+    : '';
+}
 function renderLog(){
+  renderTreat();
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
     `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda ?? edaOf(l.raw))}${(l.nban ?? nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban ?? nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':l.r==='解除'?'':'ng'}"${l.r==='解除'?' style="color:#b45309;font-weight:700"':''}>${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
@@ -901,14 +935,15 @@ function askOkNg(title, body, buttons=true){
   });
 }
 
-async function exportCsv(scope){
-  const list = scope==='all' ? (dbh ? await dbAll() : []) : dayLogs.slice().reverse();
-  if(!list.length){ await askOkNg('記録がありません', 'CSVにする照合記録がありません。', false); return; }
+async function exportCsv(scope, treat){
+  let list = scope==='all' ? (dbh ? await dbAll() : []) : dayLogs.slice().reverse();
+  if(treat) list = list.filter(l => l.r === '解除' && l.treat);
+  if(!list.length){ await askOkNg('記録がありません', treat ? '異常処置記録がありません。' : 'CSVにする照合記録がありません。', false); return; }
   if(scope==='all') list.sort((a,b)=> a.t < b.t ? -1 : 1);
   const what = scope==='all' ? '全期間' : viewDay.replace(/-/g,'/');
   if(!await askOkNg(`${what}のCSVを保存しますか？`, `${list.length}件の記録を保存します。<br>保存する → <b style="color:#16a34a">OK</b>　やめる → <b style="color:#dc2626">NG</b>`)) return;
-  const csv = csvOf(list);
-  const name = scope==='all' ? `${devTag()}_誤品照合_全期間_${stamp()}.csv` : `${devTag()}_誤品照合_${viewDay.replace(/-/g,'')}_${stamp()}.csv`;
+  const csv = treat ? csvTreat(list) : csvOf(list), nm = treat ? '異常処置記録' : '誤品照合';
+  const name = scope==='all' ? `${devTag()}_${nm}_全期間_${stamp()}.csv` : `${devTag()}_${nm}_${viewDay.replace(/-/g,'')}_${stamp()}.csv`;
   const file = new File([csv], name, {type:'text/csv'});
   if(cfg.saveMode==='share' && navigator.canShare && navigator.canShare({files:[file]})){
     try{ await navigator.share({files:[file], title:name}); await askOkNg('保存しました', name, false); return; }
@@ -937,6 +972,14 @@ async function refreshSendState(){
     ? `<span style="color:#b45309">未送信 ${un.length}件</span>（通し番号 ${un[0].no}～${un[un.length-1].no}）`
     : `<span style="color:#16a34a">すべて送信済み</span>${lastSentNo ? `（通し番号 ${lastSentNo} まで）` : ''}`;
   return {count: un.length};
+}
+// 異常処置記録のCSV（結果が「解除」の記録だけ）
+function csvTreat(list){
+  const q = s => '"' + String(s).replace(/"/g,'""') + '"';
+  const rows = [['端末番号','通し番号','日付','解除日時','NG発生日時','NG通し番号','エラーの種類','エラー内容','客先品番','枝番','納番','処置者','手順1確認','手順2確認','手順3確認','手順4確認（前の製品の確認）','手順5確認（管理者の正常確認）','現物の確認結果','客先QR全文']]
+    .concat(list.map(l => { const t = l.treat; return [l.dev||cfg.dev||'', l.no||'', l.day, t.unlockAt, t.ngAt, t.ngNo, t.kind, t.title + (t.detail ? '　' + t.detail : ''), l.hin, l.eda ?? edaOf(l.raw), l.nban ?? nbanOf(l.raw), t.who,
+      t.times[0]||'', t.times[1]||'', t.times[2]||'', t.times[3]||'', t.times[4]||'', (t.checks||[]).filter(Boolean).join(' / '), l.raw||'']; }));
+  return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 function csvOf(list){
   const q = s => '"' + String(s).replace(/"/g,'""') + '"';
