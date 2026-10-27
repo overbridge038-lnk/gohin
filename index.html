@@ -66,6 +66,14 @@ h2{font-size:16px;margin:4px 0 10px}
 #lock input{font-size:28px;padding:10px;width:220px;text-align:center;border-radius:10px;border:0;margin:14px 0 8px}
 #lock button{font-size:20px;padding:12px 30px;border-radius:10px;border:0;background:#fff;color:var(--ng);font-weight:700}
 #lockErr{min-height:24px;font-size:16px}
+#lockSteps{width:100%;max-width:520px;margin:8px 0;text-align:left}
+#lockSteps .ls{background:rgba(255,255,255,.18);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:18px;line-height:1.5}
+#lockSteps .ls.done{opacity:.65;font-size:15px}
+#lockSteps .ls.now{background:#fff;color:#1b1f24;box-shadow:0 0 0 4px #fde68a}
+#lockSteps .ls.wait{opacity:.45;font-size:15px}
+#lockSteps .ls.now b{color:#dc2626}
+#lockSteps button{display:block;width:100%;margin-top:8px;font-size:20px;padding:14px 10px;border-radius:10px;border:0;background:#16a34a;color:#fff;font-weight:700}
+#lockSteps button.ch{background:#2563eb}
 .hidden{display:none!important}
 #startCover{position:fixed;inset:0;background:#1f2937;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;text-align:center}
 .testRow button{flex:1}
@@ -94,7 +102,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-3</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-4</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -156,7 +164,7 @@ h2{font-size:16px;margin:4px 0 10px}
       </div>
       <div class="result" id="result">OK</div>
       <div class="row" style="justify-content:center;margin-top:10px">
-        <button class="btn gray" onclick="cancelCurrent()">読み直し（①からやり直す）</button>
+        <button class="btn gray" id="cancelBtn" onclick="cancelCurrent()">読み直し（①からやり直す）</button>
       </div>
     </div>
 
@@ -300,9 +308,12 @@ h2{font-size:16px;margin:4px 0 10px}
   <h2>⚠ NG</h2>
   <div class="msg" id="lockTitle"></div>
   <div class="msg" id="lockDetail" style="font-size:16px"></div>
-  <input id="lockPw" type="password" inputmode="numeric" placeholder="解除番号">
-  <div id="lockErr"></div>
-  <button onclick="tryUnlock()">解除</button>
+  <div id="lockSteps"></div>
+  <div id="lockPwBox" style="display:none">
+    <input id="lockPw" type="password" inputmode="numeric" placeholder="解除番号（管理者）">
+    <div id="lockErr"></div>
+    <button onclick="tryUnlock()">解除</button>
+  </div>
 </div>
 
 <!-- パスワード確認（設定・リセット用） -->
@@ -537,6 +548,9 @@ function onScan(raw){
     if(recheck && key === recheck.key){                // NGになった客先かんばんの読み直し → 再照合として受け付ける（重複にしない）
       cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); sound('read'); return;
     }
+    if(recheck){                                        // NGの再照合が終わるまで、ほかのかんばんは読ませない（NGを飛ばして先へ進めない）
+      imeWarn('NGの再照合が終わっていません。NGになった客先かんばんを、もう一度読み取ってください'); sound('ng'); return;
+    }
     if(!(howMode() === 'contain' && looksInner(raw))){
       const usual = looksCut(raw);
       if(usual && shortOnce !== key){
@@ -632,7 +646,7 @@ function fail(title, detail, rec){
     LS.set('recheck', recheck);
   }
   cur = null; renderSteps();
-  lock(title, detail);
+  lock(title, detail, {kind:rec.kind||'', no:log.no, raw:rec.raw||'', hin:rec.hin||''});
 }
 function showOk(sub){
   const r = document.getElementById('result');
@@ -640,25 +654,93 @@ function showOk(sub){
   if(sub){ const d = document.createElement('div'); d.style.fontSize = '30px'; d.textContent = sub; r.appendChild(d); }
   clearTimeout(showOk.t); showOk.t = setTimeout(()=>{ r.className='result'; }, sub ? 2500 : 1500);
 }
-function cancelCurrent(){ cur = null; renderSteps(); focusInput(); }
+function cancelCurrent(){
+  if(recheck){ abandonRecheck(); return; }   // NGの再照合中は、管理者しかやめられない
+  cur = null; renderSteps(); focusInput();
+}
+function abandonRecheck(){
+  const v = prompt('NGの再照合をやめます。管理者の解除番号を入れてください');
+  if(v === null) return;
+  if(toHalf(v).trim() !== toHalf(String(cfg.pw)).trim()){ alert('番号が違います'); return; }
+  addUnlockLog({kind:'', no:recheck.ngNo, raw:recheck.raw, hin:recheck.hin}, `NG 通し番号 ${recheck.ngNo} の再照合を管理者がやめた`);
+  recheck = null; LS.set('recheck', null); cur = null; renderSteps(); focusInput();
+}
 
 /* ---------- ロック ---------- */
-function lock(title, detail){
-  locked = true; LS.set('lockState', {title, detail});
+// 解除の手順：NGの種類ごとに、1つずつ「できた」を押して進む。全部できたら、管理者が解除番号を入れる（誰が処置しても同じ手順にする）
+// c があるステップは、現物を見た結果を選ぶ。t は文字、または（選んだ結果）→文字
+const UNLOCK_STEPS = {
+  mismatch: [
+    {t:'まず手を止める。かんばんも現物も、まだ動かさない・差し替えない。'},
+    {t:'客先かんばんと現物のラベルを見比べて、品番が同じか目で確認する。', c:['現物は客先かんばんと同じ品だった（社内かんばんが違う）','現物が客先かんばんと違う品だった（誤品）']},
+    {t:p => p[1] === 0 ? '正しい社内かんばん（客先かんばんと同じ品番）を探して、手元に置く。' : '誤品を取り除いて、別の場所に置く。客先かんばんの品を正しく入れ直す。'},
+    {t:'管理者を呼ぶ。管理者が現物とかんばんを見て、確認できたら解除番号を入れる。'}],
+  dup: [
+    {t:'まず手を止める。次のかんばんは読まない。'},
+    {t:'上の「前回の読取」の時刻（と枝番）から、前回読んだかんばんと現物を探す。'},
+    {t:'確認した結果を選ぶ。', c:['同じかんばんを二重に読んだだけ（かんばんは1枚）','同じかんばんが2枚ある／前回のかんばんが見つからない']},
+    {t:p => p[2] === 0 ? '二重に読んだかんばんは、もう読まない。次のかんばんから続ける。' : '先へ進めない。現物とかんばんの数が合わない可能性があるので、管理者に伝えて確認してもらう。'},
+    {t:'管理者を呼ぶ。管理者が確認できたら解除番号を入れる。'}],
+  other: [
+    {t:'まず手を止める。かんばんも現物も、まだ動かさない・差し替えない。'},
+    {t:'上のメッセージを読む。かんばんの汚れ・折れ・読み順（①客先 → ②社内）を確認する。'},
+    {t:'管理者を呼ぶ。管理者が確認できたら解除番号を入れる。'}]
+};
+let lockCtx = null;   // {kind, no, raw, hin, done, picks}
+function stepsOf(ctx){ return UNLOCK_STEPS[ctx.kind === '品番不一致' || ctx.kind === '背番号不一致' ? 'mismatch' : ctx.kind === 'かんばん重複' ? 'dup' : 'other']; }
+function renderLockSteps(){
+  const st = stepsOf(lockCtx), esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const txt = (x, i) => typeof x.t === 'function' ? x.t(lockCtx.picks) : x.t;
+  document.getElementById('lockSteps').innerHTML = st.map((x, i) => {
+    const n = `<b>${i+1}.</b> ${esc(txt(x, i))}`;
+    if(i < lockCtx.done) return `<div class="ls done">✓ ${n}${x.c ? `<br>→ ${esc(x.c[lockCtx.picks[i]])}` : ''}</div>`;
+    if(i > lockCtx.done) return `<div class="ls wait">${n}</div>`;
+    return `<div class="ls now">${n}` + (x.c ? x.c.map((c, k) => `<button class="ch" onclick="lockStepDone(${i},${k})">${esc(c)}</button>`).join('')
+                                              : `<button onclick="lockStepDone(${i})">✓ できた（次へ）</button>`) + `</div>`;
+  }).join('');
+  document.getElementById('lockPwBox').style.display = lockCtx.done >= st.length ? 'block' : 'none';
+  if(lockCtx.done >= st.length) setTimeout(()=>document.getElementById('lockPw').focus(), 100);
+}
+function lockStepDone(i, pick){
+  if(!lockCtx || i !== lockCtx.done) return;          // 順番どおりにしか進めない
+  if(pick !== undefined) lockCtx.picks[i] = pick;
+  lockCtx.done++; LS.set('lockState', lockState());
+  if(i === 0) clearInterval(lock.t);                   // 手を止めたら警告音は止める（画面のロックはそのまま）
+  renderLockSteps();
+}
+function lockState(){ return {title:document.getElementById('lockTitle').textContent, detail:document.getElementById('lockDetail').textContent, ctx:lockCtx}; }
+function lock(title, detail, ctx, resume){
+  locked = true;
+  lockCtx = ctx ? Object.assign({done:0, picks:[]}, ctx) : {kind:'', done:0, picks:[]};
   document.getElementById('lockTitle').textContent = title;
   document.getElementById('lockDetail').textContent = detail;
   document.getElementById('lockPw').value = '';
   document.getElementById('lockErr').textContent = '';
+  LS.set('lockState', lockState());
+  renderLockSteps();
   document.getElementById('lock').classList.add('show');
-  beep(false);
-  clearInterval(lock.t); lock.t = setInterval(()=>beep(false), 3000);
-  setTimeout(()=>document.getElementById('lockPw').focus(), 100);
+  clearInterval(lock.t);
+  if(!lockCtx.done){ beep(false); lock.t = setInterval(()=>beep(false), 3000); }
+}
+function unlockPicksTxt(ctx){
+  const st = stepsOf(ctx), out = [];
+  st.forEach((x, i) => { if(x.c && ctx.picks[i] !== undefined) out.push(x.c[ctx.picks[i]]); });
+  return out.length ? '：' + out.join(' / ') : '';
+}
+// 解除したことを記録に追記する（結果は「解除」。OK／NGの件数には数えない）
+function addUnlockLog(ctx, note){
+  const rec = {day:dayKey(), t:now(), hin:ctx.hin||'', inner:'', r:'解除', raw:ctx.raw||'', dev:cfg.dev||'', no:nextNo(), note, eda:edaOf(ctx.raw), nban:nbanOf(ctx.raw)};
+  if(rec.day !== today) rollDay();
+  if(viewDay === rec.day){ dayLogs.unshift(rec); renderLog(); }
+  if(dbh) dbAdd(rec).then(()=>{ refreshSendState(); }).catch(()=>alert('記録の保存に失敗しました。端末の空き容量を確認してください。'));
 }
 function tryUnlock(){
   // 全角数字や前後の空白が入っても、番号として正しく比べる
+  if(!lockCtx || lockCtx.done < stepsOf(lockCtx).length) return;   // 手順が全部終わるまで解除できない
   const v = toHalf(document.getElementById('lockPw').value).trim();
   if(v === toHalf(String(cfg.pw)).trim()){
-    locked = false; clearInterval(lock.t); LS.set('lockState', null);
+    addUnlockLog(lockCtx, 'NG 通し番号 ' + (lockCtx.no || '') + ' の解除（手順を全部確認' + unlockPicksTxt(lockCtx) + '）');
+    locked = false; clearInterval(lock.t); LS.set('lockState', null); lockCtx = null;
     document.getElementById('lock').classList.remove('show');
     if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); }   // NGの客先かんばんはそのまま。正規の社内かんばんを待つ
     lastScan = {v:'', t:0};
@@ -687,6 +769,7 @@ function renderSteps(){
     document.getElementById('s1e').innerHTML = '&nbsp;';
     document.getElementById('guide').textContent = '① 客先かんばんを読み取ってください';
   }
+  document.getElementById('cancelBtn').textContent = recheck ? 'NGの再照合をやめる（管理者）' : '読み直し（①からやり直す）';
   document.getElementById('s2v').textContent = '－';
   document.getElementById('cOk').textContent = todayStat.ok;
   document.getElementById('cNg').textContent = todayStat.ng;
@@ -735,12 +818,12 @@ function addLog(hin, inner, r, raw, note){
 function renderLog(){
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda ?? edaOf(l.raw))}${(l.nban ?? nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban ?? nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':'ng'}">${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
+    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda ?? edaOf(l.raw))}${(l.nban ?? nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban ?? nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':l.r==='解除'?'':'ng'}"${l.r==='解除'?' style="color:#b45309;font-weight:700"':''}>${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
     || '<tr><td colspan="5" class="hint">この日の記録はありません</td></tr>';
   renderGaps();
   const ok = dayLogs.filter(l=>l.r==='OK').length;
   document.getElementById('daySum').innerHTML =
-    `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.length-ok}</b>件` +
+    `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.filter(l=>String(l.r).startsWith('NG')).length}</b>件` +
     (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
 }
 // 枝番の抜けチェック：OKの記録を納番ごと（納番がなければ品番ごと）に古い順に見て、枝番が1から順に揃っているか調べる。
@@ -898,7 +981,7 @@ async function initRecords(){
     const noNo = (await dbAll()).filter(l=>!l.no).sort((a,b)=>a.id-b.id);
     for(const l of noNo){ l.no = nextNo(); l.dev = l.dev || cfg.dev || ''; await dbPut(l); }
     const t = await dbDay(today);
-    todayStat = {ok:t.filter(l=>l.r==='OK').length, ng:t.filter(l=>l.r!=='OK').length};
+    todayStat = {ok:t.filter(l=>l.r==='OK').length, ng:t.filter(l=>String(l.r).startsWith('NG')).length};
     dayLogs = t.reverse();
   }catch(e){ alert('記録用の保存領域を開けませんでした：' + e); }
   await refreshDays(); renderLog(); renderSteps();
@@ -1309,7 +1392,7 @@ renderSteps(); renderPosSummary(); renderDev(); initRecords();
 (function restoreState(){
   recheck = LS.get('recheck', null);
   const lk = LS.get('lockState', null);
-  if(lk){ lock(lk.title, lk.detail); return; }
+  if(lk){ lock(lk.title, lk.detail, lk.ctx, true); return; }
   if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); }
 })();
 
