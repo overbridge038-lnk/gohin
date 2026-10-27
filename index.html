@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-7</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-8</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -686,26 +686,13 @@ function abandonRecheck(){
 /* ---------- ロック ---------- */
 // 解除の手順：NGの種類ごとに、1つずつ「できた」を押して進む。全部できたら、管理者が解除番号を入れる（誰が処置しても同じ手順にする）
 // c があるステップは、現物を見た結果を選ぶ。t は文字、または（選んだ結果）→文字
-const UNLOCK_STEPS = {
-  mismatch: [
-    {t:'作業を止めさせる。かんばんも現物も、まだ動かさせない・差し替えさせない。'},
-    {t:'客先かんばんと社内かんばんと現物を見比べて、異常内容を確認する。'},
-    {t:'誤品を取り除いて、別の場所に置かせる。客先かんばんの品を、正しく入れ直させる。'},
-    {t:'エラーが出た前の製品（直前にOKで通した製品）は正常か確認する。'},
-    {t:'処置者が現物とかんばんを見て、正常か確認する。'}],
-  dup: [
-    {t:'作業を止めさせる。次のかんばんは読ませない。'},
-    {t:'上の「前回の読取」の時刻（と枝番）から、前回読んだかんばんと現物を探して、確認する。'},
-    {t:'同じかんばんが2枚ないか、二重に読んだだけかを確認する。2枚ある・前回のかんばんが見つからないときは、先へ進ませず原因を確認する。'},
-    {t:'エラーが出た前の製品（直前にOKで通した製品）は正常か確認する。'},
-    {t:'処置者が現物とかんばんを見て、正常か確認する。'}],
-  other: [
-    {t:'作業を止めさせる。かんばんも現物も、まだ動かさせない・差し替えさせない。'},
-    {t:'上のメッセージを読み、エラーの原因を確認する。'},
-    {t:'かんばんの汚れ・折れ・読み順（①客先 → ②社内）を確認し、直させる。'},
-    {t:'エラーが出た前の製品（直前にOKで通した製品）は正常か確認する。'},
-    {t:'処置者が現物とかんばんを見て、正常か確認する。'}]
-};
+const UNLOCK_STEPS_ALL = [   // どのエラーでも同じ5項目
+  {t:'作業を止めさせる。かんばんも現物も、まだ動かさせない・差し替えさせない。'},
+  {t:'客先かんばんと社内かんばんと現物を見比べて、異常内容を確認する。'},
+  {t:'誤品を取り除いて、別の場所に置かせる。客先かんばんの品を、正しく入れ直させる。'},
+  {t:'エラーが出た前の製品（直前にOKで通した製品）は正常か確認する。'},
+  {t:'処置者が現物とかんばんを見て、正常か確認する。'}];
+const UNLOCK_STEPS = {mismatch:UNLOCK_STEPS_ALL, dup:UNLOCK_STEPS_ALL, other:UNLOCK_STEPS_ALL};
 let lockCtx = null;   // {kind, no, raw, hin, done, picks}
 function stepsOf(ctx){ return UNLOCK_STEPS[ctx.kind === '品番不一致' || ctx.kind === '背番号不一致' ? 'mismatch' : ctx.kind === 'かんばん重複' ? 'dup' : 'other']; }
 function renderLockSteps(){
