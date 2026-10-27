@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-6</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.10.27-7</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 
@@ -695,8 +695,8 @@ const UNLOCK_STEPS = {
     {t:'処置者が現物とかんばんを見て、正常か確認する。'}],
   dup: [
     {t:'作業を止めさせる。次のかんばんは読ませない。'},
-    {t:'上の「前回の読取」の時刻（と枝番）から、前回読んだかんばんと現物を探して、結果を選ぶ。', c:['同じかんばんを二重に読んだだけ（かんばんは1枚）','同じかんばんが2枚ある／前回のかんばんが見つからない']},
-    {t:p => p[1] === 0 ? '二重に読んだかんばんは、もう読ませない。次のかんばんから続けさせる。' : '先へ進ませない。現物とかんばんの数が合わない可能性があるので、原因を確認する。'},
+    {t:'上の「前回の読取」の時刻（と枝番）から、前回読んだかんばんと現物を探して、確認する。'},
+    {t:'同じかんばんが2枚ないか、二重に読んだだけかを確認する。2枚ある・前回のかんばんが見つからないときは、先へ進ませず原因を確認する。'},
     {t:'エラーが出た前の製品（直前にOKで通した製品）は正常か確認する。'},
     {t:'処置者が現物とかんばんを見て、正常か確認する。'}],
   other: [
