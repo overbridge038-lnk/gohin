@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.04-2</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 <div id="minoBand" class="hidden" style="background:#f59e0b;color:#111;font-weight:700;text-align:center;padding:8px 10px;font-size:16px"></div>
@@ -353,15 +353,15 @@ function seenAt(key){
   return '';
 }
 // 客先QR全文から、かんばん枚数の枝番（「K」と「Z」の間の数字。例：…P017K34Z… → 34）を取り出す。なければ空
-// もう1つの形式（「JT」で始まるQR）は、末尾が「枝番6桁＋収容数5桁＋背番号4文字＋日付6桁」。ラベルの「枝番 2106」（002106）を枝番にする
+// もう1つの形式（「JT」「JY」など、J＋英字＋数字7桁で始まるQR）は、末尾が「枝番6桁＋収容数5桁＋背番号4文字＋日付6桁」。ラベルの「枝番 2106」（002106）を枝番にする
 function edaOf(raw){
   const t = String(raw||''), m = t.match(/K(\d+)Z/);
   if(m) return String(+m[1]);
-  const j = /^JT/.test(t) && t.match(/(\d{6})\d{5}[0-9A-Z]{4}\d{6}\s*$/);
+  const j = /^J[A-Z]\d{7}/.test(t) && t.match(/(\d{6})\d{5}[0-9A-Z]{4}\d{6}\s*$/);
   return j ? String(+j[1]) : '';
 }
-// 「JT」形式のロット（納入日＋便＋ロット記号。例：2026102801 C0860）。納番がない形式の抜けチェックの単位にする
-function lotOf(raw){ const m = /^JT/.test(String(raw||'')) && String(raw).match(/(20\d{8})\s+([A-Z]\d{4})\s/); return m ? m[1] + ' ' + m[2] : ''; }
+// 「JT」「JY」形式のロット（納入日＋便＋ロット記号。例：2026102801 C0860）。納番がない形式の抜けチェックの単位にする
+function lotOf(raw){ const m = /^J[A-Z]\d{7}/.test(String(raw||'')) && String(raw).match(/(20\d{8})\s+([A-Z]\d{4})\s/); return m ? m[1] + ' ' + m[2] : ''; }
 // 客先QR全文から納番（ラベルの「納番：J19780」。「10K」の次の6文字）を取り出す。枝番はこの納番の中の何枚目か（ラベルの「1/8」の1）
 function nbanOf(raw){ const m = String(raw||'').match(/10K([0-9A-Z]{6})20P/); return m ? m[1] : ''; }
 function edaTxt(raw){ const e = edaOf(raw), n = nbanOf(raw); return e ? `${n ? '納番 ' + n + '　' : ''}枝番 ${e}　／　` : ''; }
@@ -867,7 +867,7 @@ function renderLog(){
   renderTreat();
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda ?? edaOf(l.raw))}${(l.nban ?? nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban ?? nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':l.r==='解除'?'':'ng'}"${l.r==='解除'?' style="color:#b45309;font-weight:700"':''}>${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
+    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda || edaOf(l.raw))}${(l.nban || nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban || nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':l.r==='解除'?'':'ng'}"${l.r==='解除'?' style="color:#b45309;font-weight:700"':''}>${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
     || '<tr><td colspan="5" class="hint">この日の記録はありません</td></tr>';
   renderGaps();
   const ok = dayLogs.filter(l=>l.r==='OK').length;
@@ -887,10 +887,10 @@ function groupOf(raw){
 function findGaps(list){
   const runs = {}, names = {}, out = [];
   for(const l of list.slice().reverse()){
-    const e = l.r === 'OK' ? +(l.eda ?? edaOf(l.raw)) : 0, k = e ? groupOf(l.raw) : '';
+    const e = l.r === 'OK' ? +(l.eda || edaOf(l.raw)) : 0, k = e ? groupOf(l.raw) : '';
     if(!k) continue;
     const a = runs[k] = runs[k] || [];
-    names[k] = {nb:l.nban ?? nbanOf(l.raw), lot:lotOf(l.raw), hin:l.hin};
+    names[k] = {nb:l.nban || nbanOf(l.raw), lot:lotOf(l.raw), hin:l.hin};
     let r = a[a.length-1];
     if(!r || r.set.has(e)){ r = {set:new Set(), seq:[]}; a.push(r); }
     r.set.add(e); r.seq.push(e);
@@ -940,7 +940,7 @@ async function endMino(){
   if(!await askOkNg('未納処理を終了しますか？', '未納処理中に読んだ内容と、枝番の抜けを、異常処置記録に残します。<br>終了する → <b style="color:#16a34a">OK</b>　続ける → <b style="color:#dc2626">NG</b>')) return;
   const all = (dbh ? await dbAll() : []).filter(l => l.mino && l.t >= mino.startAt).sort((a, b) => (b.no||0) - (a.no||0));
   const ok = all.filter(l => l.r === 'OK'), ng = all.filter(l => String(l.r).startsWith('NG'));
-  const groups = {}; ok.slice().reverse().forEach(l => { const k = groupOf(l.raw); if(k && l.eda !== '') (groups[k] = groups[k] || {nb:l.nban ?? nbanOf(l.raw), lot:lotOf(l.raw), hin:l.hin, eda:[]}).eda.push(+(l.eda ?? edaOf(l.raw))); });
+  const groups = {}; ok.slice().reverse().forEach(l => { const k = groupOf(l.raw); if(k && (l.eda || edaOf(l.raw))) (groups[k] = groups[k] || {nb:l.nban || nbanOf(l.raw), lot:lotOf(l.raw), hin:l.hin, eda:[]}).eda.push(+(l.eda || edaOf(l.raw))); });
   const gaps = findGaps(all);
   const lines = Object.keys(groups).map(k => { const g = groups[k], miss = gaps.filter(x => x.key === k).flatMap(x => x.miss);
     return `${g.nb ? '納番 ' + g.nb + '（' + g.hin + '）' : g.hin + (g.lot ? '（ロット ' + g.lot + '）' : '')}：読んだ枝番 ${g.eda.join('・')}${miss.length ? `（抜け ${miss.join('・')}）` : ''}`; });
@@ -1047,14 +1047,14 @@ async function refreshSendState(){
 function csvTreat(list){
   const q = s => '"' + String(s).replace(/"/g,'""') + '"';
   const rows = [['端末番号','通し番号','日付','解除日時','NG発生日時','NG通し番号','エラーの種類','エラー内容','客先品番','枝番','納番','手順1確認','手順2確認','手順3確認','手順4確認（前の製品の確認）','手順5確認（管理者の正常確認）','現物の確認結果','客先QR全文']]
-    .concat(list.map(l => { const t = l.treat; return [l.dev||cfg.dev||'', l.no||'', l.day, t.unlockAt, t.ngAt, t.ngNo, t.kind, t.title + (t.detail ? '　' + t.detail : ''), l.hin, l.eda ?? edaOf(l.raw), l.nban ?? nbanOf(l.raw),
+    .concat(list.map(l => { const t = l.treat; return [l.dev||cfg.dev||'', l.no||'', l.day, t.unlockAt, t.ngAt, t.ngNo, t.kind, t.title + (t.detail ? '　' + t.detail : ''), l.hin, l.eda || edaOf(l.raw), l.nban || nbanOf(l.raw),
       t.times[0]||'', t.times[1]||'', t.times[2]||'', t.times[3]||'', t.times[4]||'', (t.checks||[]).filter(Boolean).join(' / '), l.raw||'']; }));
   return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 function csvOf(list){
   const q = s => '"' + String(s).replace(/"/g,'""') + '"';
   const rows = [['端末番号','通し番号','日付','日時','客先品番','社内品番','結果','客先QR全文','備考','枝番','納番']]
-    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'', l.note||'', l.eda ?? edaOf(l.raw), l.nban ?? nbanOf(l.raw)]));
+    .concat(list.map(l=>[l.dev||cfg.dev||'', l.no||'', l.day, l.t, l.hin, l.inner, l.r, l.raw||'', l.note||'', l.eda || edaOf(l.raw), l.nban || nbanOf(l.raw)]));
   return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 
