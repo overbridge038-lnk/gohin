@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-2</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 <div id="minoBand" class="hidden" style="background:#f59e0b;color:#111;font-weight:700;text-align:center;padding:8px 10px;font-size:16px"></div>
@@ -622,7 +622,9 @@ function onScan(raw){
   }else{
     // ② 社内かんばん
     if(cur.recheck && raw.trim() === cur.key){ sound('read'); return; }   // 再照合中に同じ客先かんばんを読み直しても、そのまま②を待つ
-    if(looksCustomer(raw, cur.raw)){ imeWarn('これは客先かんばんです。② 社内かんばんを読み取ってください'); sound('ng'); return; }   // ロックはせず、②のまま待つ
+    // 「入っていればOK」では、社内かんばんは短い形式なので、客先かんばんの形なら受け付けない。
+    // 位置指定（三五など）では、社内かんばんも客先と同じ長いQRなので、形では見分けず、①と全く同じQRを2回読んだときだけ受け付けない
+    if(cur.whole ? looksCustomer(raw, cur.raw) : raw.trim() === String(cur.raw).trim()){ imeWarn('これは客先かんばんです。② 社内かんばんを読み取ってください'); sound('ng'); return; }   // ロックはせず、②のまま待つ
     if(cur.whole){
       // 入っていればOK：社内かんばんの「5桁-5桁」の品番が、客先かんばんのQR全文の中にあるか探す
       lastRaw.i = raw; LS.set('lastRaw', lastRaw);
