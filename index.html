@@ -104,9 +104,10 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-3</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-4</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
+<div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
 <div id="minoBand" class="hidden" style="background:#f59e0b;color:#111;font-weight:700;text-align:center;padding:8px 10px;font-size:16px"></div>
 
 <main>
@@ -1544,6 +1545,27 @@ renderSteps(); renderPosSummary(); renderDev(); renderMino(); initRecords();
   if(lk){ lock(lk.title, lk.detail, lk.ctx, true); return; }
   if(recheck){ cur = Object.assign({}, recheck, {recheck:true}); renderSteps(); }
 })();
+
+/* ---------- 新しい版のお知らせ ---------- */
+// オンラインのときに、公開されている版を調べて、違っていれば上の青い帯で知らせる。タップすると更新する（記録・設定・未納処理・ロックの状態は残る）
+const APP_VER = document.getElementById('verBadge').textContent.trim();
+let newVer = '';
+async function checkUpdate(){
+  if(!navigator.onLine) return;
+  try{
+    const r = await fetch('index.html?v=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const m = (await r.text()).match(/id="verBadge"[^>]*>(ver\.[0-9.]+-[0-9]+)</);
+    if(m && m[1] !== APP_VER){ newVer = m[1]; const b = document.getElementById('updBand'); b.textContent = `新しい版があります（${newVer}）。ここをタップして更新`; b.classList.remove('hidden'); }
+  }catch(_){}
+}
+function applyUpdate(){
+  if(cur || locked){ alert('読取の途中です。①から読み直すか、NGの処置を終えてから、更新してください'); return; }
+  location.reload();
+}
+setTimeout(checkUpdate, 3000); setInterval(checkUpdate, 5 * 60 * 1000);
+window.addEventListener('online', checkUpdate);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) checkUpdate(); });
 
 /* ---------- オフライン対応 ---------- */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
