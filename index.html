@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-2</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-3</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 <div id="minoBand" class="hidden" style="background:#f59e0b;color:#111;font-weight:700;text-align:center;padding:8px 10px;font-size:16px"></div>
@@ -575,7 +575,7 @@ function onScan(raw){
     if(recheck){                                        // NGの再照合が終わるまで、ほかのかんばんは読ませない（NGを飛ばして先へ進めない）
       imeWarn('NGの再照合が終わっていません。NGになった客先かんばんを、もう一度読み取ってください'); sound('ng'); return;
     }
-    if(!(howMode() === 'contain' && looksInner(raw))){
+    if(!looksInner(raw)){
       const usual = looksCut(raw);
       if(usual && shortOnce !== key){
         shortOnce = key;
@@ -586,7 +586,7 @@ function onScan(raw){
       if(usual){ const L = [...key].length; cLens[L] = Math.max(cLens[L]||0, 3); LS.set('cLens', cLens); }
       shortOnce = '';
     }
-    if(howMode() === 'contain' && looksInner(raw)){
+    if(looksInner(raw)){
       // 社内かんばんを①で読んだ（読み順のズレ）。ロックせず案内し、ズレが続かないよう①のまま待つ
       imeWarn('これは社内かんばんです。① 客先かんばんから読んでください'); sound('ng'); return;
     }
@@ -652,7 +652,8 @@ function onScan(raw){
       }
       return;
     }
-    const ihin = cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
+    // 社内かんばんが「AAA,品番,背番号,数量」の短い形式（三五の号口など）なら、その品番で照合する。長いQR（三五の補給かんばんなど）は、位置で切り出して照合する
+    const ihin = looksInner(raw) ? innerFields(raw).hin : cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
     const a = norm(cur.hin), b = norm(ihin);
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
     if(match){
