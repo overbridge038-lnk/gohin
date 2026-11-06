@@ -1,9 +1,9 @@
-// 誤品照合 オフライン用サービスワーカー（v8）
+// 誤品照合 オフライン用サービスワーカー（v17）
 // ・オンラインのとき：ページは常に最新版をGitHubから取得（取得できたら端末にも保存）
 // ・オフラインのとき：端末に保存してある版で起動
 // v3の変更：カメラ読取ライブラリの保存に失敗しても、ページ本体は必ず保存する
 //           （v2は1つでも失敗すると何も保存されず、オフラインで開けなかった）
-const CACHE = 'gohin-v16';
+const CACHE = 'gohin-v17';
 const CORE = ['./', './index.html'];
 const LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
 
@@ -45,8 +45,10 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
 
-  // ページ本体（index.html）はネット優先
-  if (req.mode === 'navigate') {
+  // ページ本体（index.html）はネット優先。新しい版のお知らせの確認（index.html?v=…）も、保存版ではなく最新を取りに行く
+  const u = new URL(req.url);
+  const isPage = req.mode === 'navigate' || (u.origin === location.origin && /\/(index\.html)?$/.test(u.pathname));
+  if (isPage) {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE);
       try {
