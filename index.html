@@ -38,6 +38,7 @@ main{padding:12px;max-width:720px;margin:0 auto}
 .mkWait{display:inline-block;background:#fef3c7;color:#92400e;font-weight:700;padding:4px 8px;border-radius:6px}
 .mkRow .mkPos button{padding:6px 10px;font-size:13px;border-radius:8px;border:1px solid #9ca3af;background:#f3f4f6}
 #scanInput{width:100%;font-size:18px;padding:12px;border:2px solid var(--pri);border-radius:10px}
+#scanInput:focus{outline:4px solid var(--pri);outline-offset:1px;background:#eff6ff}   /* カーソルがここにあるとき（ここが入力先）は、濃い枠と薄い青で分かるようにする */
 .modes{display:flex;gap:8px;margin-bottom:10px}
 .modes button{flex:1;padding:10px;border-radius:10px;border:2px solid #d1d5db;background:#fff;font-size:15px}
 .modes button.on{border-color:var(--pri);background:var(--pri);color:#fff}
@@ -104,7 +105,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.11-2</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.12-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 <div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
@@ -221,7 +222,7 @@ h2{font-size:16px;margin:4px 0 10px}
         </select></div>
       <div class="row"><label>スキャナーの受け取り方</label>
         <select id="cfgFast">
-          <option value="fast">高速（読取欄を使わずに直接受け取る・おすすめ）</option>
+          <option value="fast">高速（読取欄は読み取り専用・カーソルは読取欄に置く・おすすめ）</option>
           <option value="field">従来（読取欄に文字を入れて受け取る）</option>
         </select></div>
       <p class="hint">「高速」は、タブレットのキーボードアプリを通さずにスキャナーの文字を受け取るので、遅いタブレットでも速く読めます。うまく読めないタブレットだけ「従来」にしてください。</p>
@@ -1216,14 +1217,28 @@ document.addEventListener('keydown', e=>{
   if(document.activeElement!==inp){ focusInput(); }        // 読取欄から外れていたら戻す（キー位置の記録で取りこぼしなし）
 });
 inp.addEventListener('input', ()=>{ scanLast = performance.now(); armFlush(); });
-// 高速のときに読取欄を触ってカーソルが入っても、すぐ外す
-inp.addEventListener('focus', ()=>{ if(fastScan() && cfg.mode==='scanner' && !capture) inp.blur(); });
+// カーソルは、いつも読取欄（「ここにスキャナーで読み取り」）に置く（入力先の間違いを防ぐ）。
+// 高速のときは、読取欄を「読み取り専用」にしてカーソルを置く。読み取り専用の欄は、キーボードアプリ（Gboardなど）を通らないので、読取は遅くならない
 function focusInput(){
   if(cfg.mode!=='scanner' || locked || document.getElementById('viewMain').classList.contains('hidden')) return;
-  if(fastScan()){ if(document.activeElement===inp) inp.blur(); return; }
-  inp.focus();
+  inp.readOnly = fastScan();
+  if(document.activeElement !== inp) inp.focus({preventScroll:true});
 }
 document.addEventListener('click', e=>{ if(!['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) focusInput(); });
+// ボタンを押したあと・選択を変えたあと・確認画面を閉じたあとなどで、カーソルが外れたままにならないよう、読取欄へ戻す
+function keepScanFocus(){
+  if(cfg.mode!=='scanner' || locked || capture) return;
+  if(document.getElementById('viewMain').classList.contains('hidden')) return;     // 設定画面などのとき
+  if(document.querySelector('button[data-v]')) return;                              // 確認画面（OK／NGなど）が出ているとき
+  const a = document.activeElement;
+  if(a === inp) return;
+  if(a && ['INPUT','TEXTAREA','SELECT'].includes(a.tagName)) return;               // ほかの入力欄を操作中は、触らない
+  focusInput();
+}
+setInterval(keepScanFocus, 700);
+document.addEventListener('change', e => {      // 日付の選択などを変えたら、すぐ読取欄へ戻す
+  if(e.target !== inp && e.target.closest && e.target.closest('#viewMain')){ e.target.blur(); setTimeout(focusInput, 30); }
+});
 
 function setMode(m){
   cfg.mode = m; LS.set('cfg', cfg);
