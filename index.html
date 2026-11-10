@@ -104,7 +104,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.11-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.06-5</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button onclick="openSettings()">⚙ 設定</button></div>
 </header>
 <div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
@@ -199,7 +199,6 @@ h2{font-size:16px;margin:4px 0 10px}
       <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">
         <div style="font-size:15px">送信状況：<b id="unsentTxt">確認中…</b></div>
         <button class="btn" style="width:100%;background:#f59e0b;color:#111" onclick="sendToDrive()">📤 未送信分をGoogleドライブへ送る</button>
-        <button class="btn hidden" id="sendChkBtn" style="width:100%;margin-top:6px;background:#dc2626" onclick="sendCheck()">⚠ ドライブの「アップロード待ち」が空か確認する</button>
         <p class="hint">前回送った後の新しい記録だけを1つのファイルにして送ります（追加方式・上書きなし）。ファイル名は「端末番号_誤品照合_日付_時刻.csv」なので、複数台・何回送っても名前が重なりません。オンラインにしてから押し、共有先で「ドライブ」を選んでください。</p>
       </div>
       <div id="gapBox"></div>
@@ -1045,8 +1044,6 @@ async function refreshSendState(){
   document.getElementById('unsentTxt').innerHTML = un.length
     ? `<span style="color:#b45309">未送信 ${un.length}件</span>（通し番号 ${un[0].no}～${un[un.length-1].no}）`
     : `<span style="color:#16a34a">すべて送信済み</span>${lastSentNo ? `（通し番号 ${lastSentNo} まで）` : ''}`;
-  if(pendSend) document.getElementById('unsentTxt').innerHTML += `<br><span style="color:#dc2626">⚠ ドライブへの送信は、確認待ちです（通し番号 ${pendSend.from}～${pendSend.to}）。ドライブのアプリで、アップロード完了を確認してください</span>`;
-  document.getElementById('sendChkBtn').classList.toggle('hidden', !pendSend);
   return {count: un.length};
 }
 // 異常処置記録のCSV（結果が「解除」の記録だけ）
@@ -1064,40 +1061,6 @@ function csvOf(list){
   return '\uFEFF' + rows.map(r=>r.map(q).join(',')).join('\r\n');
 }
 
-// ---------- 送信の確認（ドライブのアップロード待ちが空か） ----------
-// 共有の画面が終わっただけでは、ドライブのアプリは「アップロード待ち」のことがある（テザリングが切れているときなど）。
-// そこで、ドライブのアプリで完了を確認して「確認できた」を押すまでは、「送信済み」にしない（記録は未送信のまま残り、次の送信に入る）
-let pendSend = LS.get('pendSend', null);
-function commitSent(info){
-  lastSentNo = Math.max(lastSentNo, info.to); LS.set('lastSentNo', lastSentNo);
-  LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name:info.name, from:info.from, to:info.to, n:info.n, sentAt:info.t}]).slice(-500));
-  pendSend = null; LS.set('pendSend', null);
-  refreshSendState();
-}
-function startSendCheck(info){ pendSend = info; LS.set('pendSend', info); refreshSendState(); sendCheck(); }
-function sendCheck(){
-  if(!pendSend) return;
-  const info = pendSend, esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const drive = 'intent://drive.google.com/drive/recent#Intent;scheme=https;package=com.google.android.apps.docs;S.browser_fallback_url=' + encodeURIComponent('https://drive.google.com/drive/recent') + ';end';
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto';
-  const btn = 'display:block;width:100%;font-size:19px;font-weight:700;padding:15px 8px;border:none;border-radius:12px;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box';
-  ov.innerHTML = `<div style="background:#fff;color:#1b1f24;border-radius:16px;padding:20px;max-width:460px;width:100%">
-    <div style="font-size:20px;font-weight:700;margin-bottom:8px">ドライブに届いたか、確認してください</div>
-    <div style="font-size:15px;line-height:1.7;word-break:break-all">「${esc(info.name)}」（通し番号 ${esc(info.from)}～${esc(info.to)}）を、共有しました。<br><b style="color:#dc2626">電波が切れていると、ドライブの「アップロード待ち」のまま、届かないことがあります。</b>
-    <ol style="margin:6px 0 0 18px;padding:0"><li>「ドライブのアプリを開く」を押す</li><li>「アップロード待ち」が<b>空</b>になり、ファイルが見えることを確認する</li><li>このアプリに戻って、「確認できた」を押す</li></ol>
-    ${navigator.onLine ? '' : '<div style="margin-top:6px;color:#dc2626"><b>今は、オフラインのようです。</b>テザリングをONにして、アップロードが終わるのを待ってください。</div>'}</div>
-    <a href="${drive}" style="${btn};background:#2563eb;color:#fff">ドライブのアプリを開く</a>
-    <button data-v="ok" style="${btn};background:#16a34a;color:#fff">確認できた（送信済みにする）</button>
-    <button data-v="later" style="${btn};background:#e5e7eb;color:#1b1f24">まだ・あとで確認する</button>
-    <div class="hint" style="margin-top:8px">「あとで」のときは、送信済みにならず、記録は未送信のまま残ります。確認できるまで、次の送信にも入ります。</div></div>`;
-  ov.addEventListener('click', e => {
-    const v = e.target.dataset && e.target.dataset.v; if(!v) return;
-    ov.remove();
-    if(v === 'ok'){ commitSent(info); alert(`送信済みにしました（通し番号 ${info.from}～${info.to}）。`); }
-  });
-  document.body.appendChild(ov);
-}
 async function sendToDrive(){
   if(!cfg.dev){ alert('先に⚙設定で「端末番号」を設定してください（例：01）。\n複数台のファイル名が重ならないようにするためです。'); return; }
   const list = await unsentList();
@@ -1112,22 +1075,25 @@ async function sendToDrive(){
   const sendList = list.concat(all.filter(l => l.day === today && !seen.has(l.no))).sort((a,b)=> (a.no||0) - (b.no||0));
   const name = `${devTag()}_誤品照合_${stamp()}.csv`;
   const files = [new File([csvOf(sendList)], name, {type:'text/csv'})];
-  const info = {t:now(), name, from:list[0].no, to:upto, n:list.length, all:sendList.length};
-  const markSent = () => commitSent(info);     // 共有が使えない端末（端末に保存した場合）だけ、すぐ送信済みにする
+  const markSent = () => {
+    lastSentNo = upto; LS.set('lastSentNo', lastSentNo);
+    LS.set('sendLog', (LS.get('sendLog', [])).concat([{t:now(), name, from:list[0].no, to:upto, n:list.length}]).slice(-500));
+    refreshSendState();
+    alert(`送信済みにしました（未送信${list.length}件・通し番号 ${list[0].no}～${upto}）。未送信は0件です。\nファイルには今日の記録も全部入れました（${sendList.length}件）。`);
+  };
   if(navigator.canShare && navigator.canShare({files})){
     try{
       await navigator.share({files, title:name});
-      startSendCheck(info);             // 共有が終わっただけでは「送信済み」にしない。ドライブ側のアップロード完了を確認してから送信済みにする
+      markSent();                       // 共有（送信）が完了したら、そのまま送信済みにする
     }catch(e){
-      // Androidでは送信できていても「中断」扱いで戻ることがあるため、確認する
-      if(confirm(`「${name}」をGoogleドライブに保存できましたか？\n「OK」を押すと、次に、ドライブのアップロード完了の確認に進みます。\n保存していない場合は「キャンセル」を押してください。`)) startSendCheck(info);
+      // Androidでは送信できていても「中断」扱いで戻ることがあるため、確認して送信済みにする
+      if(confirm(`「${name}」をGoogleドライブに保存できましたか？\n「OK」で送信済みにします（未送信が0件になります）。\n保存していない場合は「キャンセル」を押してください。`)) markSent();
     }
     return;
   }
   // 共有が使えない端末：CSVを端末に保存して送信済みにする
   const a=document.createElement('a'); a.href=URL.createObjectURL(files[0]); a.download=name; a.click();
   markSent();
-  alert(`CSVを端末に保存して、送信済みにしました（通し番号 ${info.from}～${info.to}）。`);
 }
 window.addEventListener('online', ()=>{ refreshSendState(); });
 
