@@ -105,8 +105,8 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1>誤品照合 <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.13-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
-  <div><button onclick="openSettings()">⚙ 設定</button></div>
+  <h1><span data-en="Wrong-Part Check">誤品照合</span> <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.13-2</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <div><button id="langBtn" onclick="toggleLang()" style="margin-right:6px">English</button><button onclick="openSettings()" data-en="⚙ Settings">⚙ 設定</button></div>
 </header>
 <div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
 <div id="minoBand" class="hidden" style="background:#f59e0b;color:#111;font-weight:700;text-align:center;padding:8px 10px;font-size:16px"></div>
@@ -116,10 +116,10 @@ h2{font-size:16px;margin:4px 0 10px}
   <section id="viewMain">
     <div class="card">
       <div class="modes">
-        <button id="mScanner" onclick="setMode('scanner')">ハンディスキャナー</button>
-        <button id="mCamera" onclick="setMode('camera')">カメラ</button>
+        <button id="mScanner" onclick="setMode('scanner')" data-en="Hand scanner">ハンディスキャナー</button>
+        <button id="mCamera" onclick="setMode('camera')" data-en="Camera">カメラ</button>
       </div>
-      <input id="scanInput" type="password" name="scan-field" placeholder="ここにスキャナーで読み取り（半角英数固定）" autocomplete="off" autocapitalize="off" autocorrect="off" inputmode="none" spellcheck="false" data-lpignore="true">
+      <input id="scanInput" type="password" name="scan-field" placeholder="ここにスキャナーで読み取り（半角英数固定）" data-en-ph="Scan here (half-width letters and numbers)" autocomplete="off" autocapitalize="off" autocorrect="off" inputmode="none" spellcheck="false" data-lpignore="true">
       <div id="scanShow" style="margin-top:6px;height:22px;overflow:hidden;white-space:nowrap;font-family:monospace;font-size:15px;color:#4b5563"></div>
       <div id="imeWarn" class="hidden" style="margin-top:8px;padding:10px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:700;font-size:15px"></div>
       <div id="reader" class="hidden"></div>
@@ -127,8 +127,8 @@ h2{font-size:16px;margin:4px 0 10px}
 
     <!-- 抜き取り位置（作業者が事前に設定・パスワード不要） -->
     <div class="card" id="posCard" style="padding:10px 14px">
-      <button class="btn" style="width:100%;padding:18px 14px;font-size:22px;font-weight:700;border-radius:12px" id="posToggle" onclick="togglePos()">メーカー選択</button>
-      <h2 id="posTitle" class="hidden" style="margin:0">メーカー選択</h2>
+      <button class="btn" style="width:100%;padding:18px 14px;font-size:22px;font-weight:700;border-radius:12px" id="posToggle" onclick="togglePos()" data-en="Select maker">メーカー選択</button>
+      <h2 id="posTitle" class="hidden" style="margin:0" data-en="Select maker">メーカー選択</h2>
       <div id="posSummary" class="hidden"></div>
       <div id="posEdit" class="hidden" style="margin-top:8px">
         <div class="posTtl">よく使う客先かんばん（押すと位置が入って保存されます）</div>
@@ -157,12 +157,12 @@ h2{font-size:16px;margin:4px 0 10px}
       <div class="guide" id="guide">① 客先かんばんを読み取ってください</div>
       <div class="steps">
         <div class="step active" id="s1">
-          <div class="lbl">① 客先かんばん</div>
+          <div class="lbl" data-en="① Customer kanban">① 客先かんばん</div>
           <div class="val" id="s1v">－</div>
           <div class="sub" id="s1e">&nbsp;</div>
         </div>
         <div class="step" id="s2">
-          <div class="lbl">② 社内かんばん</div>
+          <div class="lbl" data-en="② Internal kanban">② 社内かんばん</div>
           <div class="val" id="s2v">－</div>
           <div class="sub">&nbsp;</div>
         </div>
@@ -178,12 +178,12 @@ h2{font-size:16px;margin:4px 0 10px}
       <div class="counts">
         <div>OK<b id="cOk">0</b></div>
         <div>NG<b id="cNg">0</b></div>
-        <div>読取済みかんばん<b id="cEda">0</b></div>
+        <div><span data-en="Scanned kanban">読取済みかんばん</span><b id="cEda">0</b></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>照合記録（日付ごと・新しい順）</h2>
+      <h2 data-en="Scan log (by date, newest first)">照合記録（日付ごと・新しい順）</h2>
       <div class="row">
         <select id="daySel" onchange="changeDay(this.value)" style="flex:1;min-width:140px;padding:10px;font-size:16px;border:1px solid #d1d5db;border-radius:8px"></select>
       </div>
@@ -203,8 +203,9 @@ h2{font-size:16px;margin:4px 0 10px}
         <p class="hint">前回送った後の新しい記録だけを1つのファイルにして送ります（追加方式・上書きなし）。ファイル名は「端末番号_誤品照合_日付_時刻.csv」なので、複数台・何回送っても名前が重なりません。オンラインにしてから押し、共有先で「ドライブ」を選んでください。</p>
       </div>
       <div id="gapBox"></div>
-      <div style="max-height:300px;overflow:auto">
-        <table><thead><tr><th>時刻</th><th>客先品番</th><th>社内品番</th><th>枝番<br><span class="hint">納番</span></th><th>結果</th></tr></thead>
+      <p class="hint" style="margin:6px 0 2px" data-en="👆 Tap the table to enlarge">👆 表をタップすると、大きく表示します</p>
+      <div style="max-height:300px;overflow:auto;cursor:pointer" onclick="openLogPopup()">
+        <table><thead><tr><th data-en="Time">時刻</th><th data-en="Customer part no.">客先品番</th><th data-en="Internal part no.">社内品番</th><th data-en="Branch no.<br><span class='hint'>Lot</span>">枝番<br><span class="hint">納番</span></th><th data-en="Result">結果</th></tr></thead>
         <tbody id="logBody"></tbody></table>
       </div>
     </div>
@@ -323,6 +324,7 @@ h2{font-size:16px;margin:4px 0 10px}
 <!-- エラーロック画面 -->
 <div id="lock">
   <h2>⚠ NG</h2>
+  <div id="lockEn" style="font-size:24px;font-weight:800;line-height:1.35;margin:2px 0 8px;max-width:560px"></div>
   <div class="msg" id="lockTitle"></div>
   <div class="msg" id="lockDetail" style="font-size:16px"></div>
   <div id="lockSteps"></div>
@@ -384,6 +386,68 @@ let capture = null;                     // 設定画面で見本QRを読み取�
 let mkWork = [];                        // 設定画面で編集中のメーカー（見本QRを含む）
 let locked = false;
 let qr = null, lastCam = '', lastCamAt = 0;
+
+/* ---------- 表示言語（日本語／English）：作業する人が見る画面だけを英語にする ---------- */
+// 異常の処置（解除の手順・異常処置記録・設定・CSV）は日本人が行うので、日本語のまま。
+// 記録（CSVなど）の中身は、どちらの表示でも日本語のまま変わらない。画面に出すときだけ英語にする。
+let LANG = LS.get('lang', 'ja') === 'en' ? 'en' : 'ja';
+let newVer = '';          // 新しい版がある（確認済み）ときの版の名前
+const EN_EXACT = {
+  '① 客先かんばんを読み取ってください':'Scan the CUSTOMER kanban (①)',
+  '② 社内かんばんを読み取ってください':'Scan the INTERNAL kanban (②)',
+  'NGのやり直し：正しい社内かんばんを読み取ってください':'Re-check after NG: scan the correct internal kanban',
+  '読み取り中… 音が鳴るまで次を読まないでください':'Scanning… do not scan the next one until you hear the beep',
+  '読取OK':'Scan OK', 'NG後の再照合':'Re-check after NG', '（メーカー判定不可）':' (maker not identified)',
+  '読み直し（①からやり直す）':'Re-scan (start over from ①)',
+  'NGの再照合をやめる（管理者）':'Cancel NG re-check (supervisor)',
+  '未納処理を始める':'Start backorder mode', '未納処理を終了する':'End backorder mode',
+  'これは社内かんばんです。① 客先かんばんから読んでください':'This is an internal kanban. Scan the customer kanban first (①).',
+  'これは客先かんばんです。② 社内かんばんを読み取ってください':'This is a customer kanban. Scan the internal kanban (②).',
+  'NGの再照合が終わっていません。NGになった客先かんばんを、もう一度読み取ってください':'The NG re-check is not finished. Scan the customer kanban that was NG again.',
+  '正しく読み取れませんでした。もう一度読み取ってください。':'Could not read correctly. Please scan again.',
+  'この日の記録はありません':'No records for this day',
+  '品番不一致':'Part no. mismatch', '背番号不一致':'Back no. mismatch', 'かんばん重複':'Duplicate kanban',
+  'メーカー判定不可':'Maker not identified', '社内品番なし':'No internal part no.', '解除':'Released'
+};
+const EN_PATTERNS = [
+  [/^QR全文で照合（(\d+)文字）$/, 'Full QR match ($1 chars)'],
+  [/^読み取りが途中からになっています（(\d+)文字／いつもは(\d+)文字）。もう一度、客先かんばんを読み取ってください$/, 'The scan was cut off ($1 chars; usually $2). Scan the customer kanban again.'],
+  [/^背番号 (.+)$/, 'Back no. $1'],
+  [/^未納処理中（(.+)から）.*$/, 'BACKORDER MODE (since $1) — branch-number gaps do not lock the screen; wrong parts still lock.'],
+  [/^新しい版があります（(.+)）。ここをタップして更新$/, 'A new version is available ($1). Tap here to update.']
+];
+const EN_NOTES = [
+  [/^品番：客先QRの(\d+)～(\d+)文字目に一致$/, 'Part no.: matches customer QR chars $1–$2'],
+  [/^背番号(.+?)：客先QRの(\d+)～(\d+)文字目に一致$/, 'Back no. $1: matches customer QR chars $2–$3'],
+  [/^背番号(.+?)（照合なし）$/, 'Back no. $1 (not checked)'],
+  [/^社内かんばんに背番号なし→品番で照合$/, 'No back no. on internal kanban → matched by part no.'],
+  [/^NG後の再照合OK（NG 通し番号 (\d+)）$/, 'OK after NG re-check (NG seq. no. $1)'],
+  [/^再照合でもNG（前回NG 通し番号 (\d+)）$/, 'NG again on re-check (previous NG seq. no. $1)'],
+  [/^メーカー:(.+)$/, 'Maker: $1'],
+  [/^メーカー判定不可（手動の位置で照合）$/, 'Maker not identified (matched by manual position)'],
+  [/^未納処理中$/, 'Backorder mode']
+];
+function tr(s){
+  if(LANG !== 'en' || typeof s !== 'string') return s;
+  if(EN_EXACT[s] !== undefined) return EN_EXACT[s];
+  const m = /^NG：(.+)$/.exec(s); if(m) return 'NG: ' + tr(m[1]);
+  for(const [re, to] of EN_PATTERNS) if(re.test(s)) return s.replace(re, to);
+  return s;
+}
+function trNote(s){
+  if(LANG !== 'en' || !s) return s;
+  return String(s).split(' / ').map(x => { for(const [re, to] of EN_NOTES) if(re.test(x)) return x.replace(re, to); return x; }).join(' / ');
+}
+function dayLabelEn(k){ const [y,m,d] = k.split('-'); return `${y}/${m}/${d} (${'Sun Mon Tue Wed Thu Fri Sat'.split(' ')[new Date(+y,+m-1,+d).getDay()]})`; }
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-en]').forEach(e => { if(e.dataset.ja === undefined) e.dataset.ja = e.innerHTML; e.innerHTML = LANG === 'en' ? e.dataset.en : e.dataset.ja; });
+  document.querySelectorAll('[data-en-ph]').forEach(e => { if(e.dataset.jaPh === undefined) e.dataset.jaPh = e.placeholder; e.placeholder = LANG === 'en' ? e.dataset.enPh : e.dataset.jaPh; });
+  const b = document.getElementById('langBtn'); if(b) b.textContent = LANG === 'en' ? '日本語' : 'English';
+  renderSteps(); renderLog(); renderMino(); if(typeof renderDev === 'function' && typeof devLabel === 'function') renderDev();
+  if(newVer){ const u = document.getElementById('updBand'); u.textContent = tr(`新しい版があります（${newVer}）。ここをタップして更新`); }
+}
+function toggleLang(){ LANG = LANG === 'en' ? 'ja' : 'en'; LS.set('lang', LANG); applyLang(); if(typeof focusInput === 'function') focusInput(); }
 
 /* ---------- 共通処理 ---------- */
 function norm(s){
@@ -682,7 +746,7 @@ function fail(title, detail, rec){
 function showOk(sub){
   const r = document.getElementById('result');
   r.className = 'result ok'; r.textContent = 'OK';
-  if(sub){ const d = document.createElement('div'); d.style.fontSize = '30px'; d.textContent = sub; r.appendChild(d); }
+  if(sub){ const d = document.createElement('div'); d.style.fontSize = '30px'; d.textContent = tr(sub); r.appendChild(d); }
   clearTimeout(showOk.t); showOk.t = setTimeout(()=>{ r.className='result'; }, sub ? 2500 : 1500);
 }
 function cancelCurrent(){
@@ -737,6 +801,7 @@ function lock(title, detail, ctx, resume){
   lockCtx = Object.assign({kind:'', done:0, picks:[], times:[]}, ctx || {});
   lockCtx.title = title; lockCtx.detail = detail;
   if(!lockCtx.at) lockCtx.at = now();                  // NGが出た時刻（画面を開き直しても変わらない）
+  document.getElementById('lockEn').textContent = 'ERROR — ' + ({'品番不一致':'Wrong part possible: part number does not match','背番号不一致':'Wrong part possible: back number does not match','かんばん重複':'Same customer kanban scanned twice','枝番の抜け':'Branch number skipped'}[lockCtx.kind] || 'Scan error') + '. STOP. Do not move the parts. Call a supervisor.';
   document.getElementById('lockTitle').textContent = title;
   document.getElementById('lockDetail').textContent = detail;
   document.getElementById('lockPw').value = '';
@@ -795,18 +860,18 @@ function renderSteps(){
   const s1 = document.getElementById('s1'), s2 = document.getElementById('s2');
   if(cur){
     s1.className='step done'; s2.className='step active';
-    document.getElementById('s1v').textContent = cur.whole ? `QR全文で照合（${[...cur.raw].length}文字）` : cur.hin;
-    document.getElementById('s1e').textContent = (cur.recheck ? 'NG後の再照合' : '読取OK') + (cur.maker ? `【${cur.maker}】` : '') + (cur.makerNote ? '（メーカー判定不可）' : '');
-    document.getElementById('guide').textContent = cur.recheck
+    document.getElementById('s1v').textContent = cur.whole ? tr(`QR全文で照合（${[...cur.raw].length}文字）`) : cur.hin;
+    document.getElementById('s1e').textContent = tr(cur.recheck ? 'NG後の再照合' : '読取OK') + (cur.maker ? `【${cur.maker}】` : '') + (cur.makerNote ? tr('（メーカー判定不可）') : '');
+    document.getElementById('guide').textContent = tr(cur.recheck
       ? 'NGのやり直し：正しい社内かんばんを読み取ってください'
-      : '② 社内かんばんを読み取ってください';
+      : '② 社内かんばんを読み取ってください');
   }else{
     s1.className='step active'; s2.className='step';
     document.getElementById('s1v').textContent = '－';
     document.getElementById('s1e').innerHTML = '&nbsp;';
-    document.getElementById('guide').textContent = '① 客先かんばんを読み取ってください';
+    document.getElementById('guide').textContent = tr('① 客先かんばんを読み取ってください');
   }
-  document.getElementById('cancelBtn').textContent = recheck ? 'NGの再照合をやめる（管理者）' : '読み直し（①からやり直す）';
+  document.getElementById('cancelBtn').textContent = tr(recheck ? 'NGの再照合をやめる（管理者）' : '読み直し（①からやり直す）');
   document.getElementById('s2v').textContent = '－';
   document.getElementById('cOk').textContent = todayStat.ok;
   document.getElementById('cNg').textContent = todayStat.ng;
@@ -867,17 +932,51 @@ function renderTreat(){
       }).join('') + '</div>'
     : '';
 }
+// 照合記録の1行（big=true は、大きなポップアップ用）
+function logRow(l, big){
+  const esc = x => String(x).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const eda = l.eda || edaOf(l.raw), nb = l.nban || nbanOf(l.raw);
+  const kind = l.r === 'OK' ? 'ok' : l.r === '解除' ? 'rel' : 'ng';
+  const bg = big ? (kind === 'ng' ? 'background:#fee2e2;' : kind === 'rel' ? 'background:#fef3c7;' : '') : '';
+  const col = kind === 'ok' ? 'color:#16a34a;' : kind === 'rel' ? 'color:#b45309;' : 'color:#dc2626;';
+  const noteTxt = (big && l.r === 'OK') ? String(l.note || '').split(' / ').filter(x => /再照合|未納処理中/.test(x)).join(' / ') : l.note;   // 大きな画面では、OKの行は、要点だけにする
+  const note = noteTxt ? `<br><span style="${big ? 'font-size:17px;font-weight:400;color:#374151' : 'font-size:12px;color:#6b7280'}">${esc(trNote(noteTxt))}</span>` : '';
+  const td = big ? 'border:1px solid #d1d5db;padding:8px;vertical-align:top;' : '', tn = big ? td + 'white-space:nowrap;' : '';   // 時刻・品番・枝番は、途中で折り返さない
+  return `<tr style="${bg}"><td style="${tn}">${esc(l.t.slice(11))}</td><td style="${tn}">${esc(l.hin)}</td><td style="${tn}">${esc(l.inner)}</td><td style="${tn}">${esc(eda)}${nb ? `<br><span style="${big ? 'font-size:17px;' : 'font-size:12px;'}color:#6b7280">${esc(nb)}</span>` : ''}</td><td style="${td}${col}font-weight:700;overflow-wrap:anywhere">${esc(tr(l.r))}${note}</td></tr>`;   // 長い備考は、枠の幅で折り返す
+}
+// 照合記録の大きなポップアップ（表をタップすると開く。年配の方にも読みやすい大きさ）
+function openLogPopup(){
+  if(document.getElementById('logPop')) return;
+  const o = document.createElement('div'); o.id = 'logPop';
+  o.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9000;overflow:auto;padding:12px 14px;-webkit-overflow-scrolling:touch';
+  document.body.appendChild(o); renderLogPopup();
+}
+function closeLogPopup(){ const o = document.getElementById('logPop'); if(o) o.remove(); focusInput(); }
+function renderLogPopup(){
+  const o = document.getElementById('logPop'); if(!o) return;
+  const en = LANG === 'en', ok = dayLogs.filter(l=>l.r==='OK').length, ng = dayLogs.filter(l=>String(l.r).startsWith('NG')).length;
+  const th = 'font-size:18px;padding:8px 8px;border:1px solid #9ca3af;background:#e5e7eb;text-align:left';
+  o.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;position:sticky;top:0;background:#fff;padding:4px 0 10px;z-index:1">
+      <div><div style="font-size:26px;font-weight:800">${en ? 'Scan log' : '照合記録'}</div>
+      <div style="font-size:22px">${en ? dayLabelEn(viewDay) : dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>　NG <b style="color:#dc2626">${ng}</b></div></div>
+      <button onclick="closeLogPopup()" style="font-size:26px;font-weight:800;padding:14px 26px;border:0;border-radius:12px;background:#374151;color:#fff">${en ? 'Close' : '閉じる'}</button></div>
+    <table style="border-collapse:collapse;width:100%;font-size:22px;line-height:1.45"><thead><tr>
+      <th style="${th}">${en ? 'Time' : '時刻'}</th><th style="${th}">${en ? 'Customer part no.' : '客先品番'}</th><th style="${th}">${en ? 'Internal part no.' : '社内品番'}</th><th style="${th}">${en ? 'Branch no. / Lot' : '枝番／納番'}</th><th style="${th}">${en ? 'Result' : '結果'}</th></tr></thead>
+    <tbody>${dayLogs.slice(0,300).map(l => logRow(l, true)).join('') || `<tr><td colspan="5" style="font-size:22px;padding:14px">${tr('この日の記録はありません')}</td></tr>`}</tbody></table>
+    <button onclick="closeLogPopup()" style="display:block;width:100%;margin-top:14px;font-size:26px;font-weight:800;padding:16px;border:0;border-radius:12px;background:#374151;color:#fff">${en ? 'Close' : '閉じる'}</button>`;
+}
 function renderLog(){
   renderTreat();
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l =>
-    `<tr><td>${esc(l.t.slice(11))}</td><td>${esc(l.hin)}</td><td>${esc(l.inner)}</td><td>${esc(l.eda || edaOf(l.raw))}${(l.nban || nbanOf(l.raw)) ? `<br><span class="hint">${esc(l.nban || nbanOf(l.raw))}</span>` : ''}</td><td class="${l.r==='OK'?'ok':l.r==='解除'?'':'ng'}"${l.r==='解除'?' style="color:#b45309;font-weight:700"':''}>${esc(l.r)}${l.note?`<br><span class="hint">${esc(l.note)}</span>`:''}</td></tr>`).join('')
-    || '<tr><td colspan="5" class="hint">この日の記録はありません</td></tr>';
+  document.getElementById('logBody').innerHTML = dayLogs.slice(0,300).map(l => logRow(l, false)).join('')
+    || `<tr><td colspan="5" class="hint">${tr('この日の記録はありません')}</td></tr>`;
   renderGaps();
   const ok = dayLogs.filter(l=>l.r==='OK').length;
-  document.getElementById('daySum').innerHTML =
-    `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${dayLogs.filter(l=>String(l.r).startsWith('NG')).length}</b>件` +
-    (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
+  const ng = dayLogs.filter(l=>String(l.r).startsWith('NG')).length;
+  document.getElementById('daySum').innerHTML = LANG === 'en'
+    ? `${dayLabelEn(viewDay)}　OK <b style="color:#16a34a">${ok}</b>　NG <b style="color:#dc2626">${ng}</b>` + (dayLogs.length>300 ? '<br><span class="hint">Showing the newest 300 (the CSV has all)</span>' : '')
+    : `${dayLabel(viewDay)}　OK <b style="color:#16a34a">${ok}</b>件　NG <b style="color:#dc2626">${ng}</b>件` + (dayLogs.length>300 ? '<br><span class="hint">画面には新しい300件まで表示（CSVには全件）</span>' : '');
+  renderLogPopup();
 }
 // 枝番の抜けチェック：OKの記録を納番ごと（「JT」形式は納入日＋便＋ロット記号＋品番ごと）に古い順に見て、読んだ枝番に飛びがないか調べる。
 // 枝番は 1234 のように増える場合も 4321 のように減る場合もあるので、最初の2つの読み順で向きを決める（124 や 431 のように飛んだら抜け）。
@@ -911,14 +1010,15 @@ function findGaps(list){
 const gapSig = g => `${viewDay}|${g.key}|${g.lotNo}|${g.miss.join(',')}`;
 function pendingGaps(){ const ok = LS.get('gapOk', {}); return findGaps(dayLogs).filter(g => !ok[gapSig(g)]); }
 function gapTxt(x){ return `${x.nb ? `納番 ${x.nb}（${x.hin}）` : x.lot ? `${x.hin}（ロット ${x.lot}）` : x.hin}${x.lots>1 ? `（${x.lotNo}回目）` : ''}：枝番 ${x.miss.join('、')} が未読取（${x.max}まで）`; }
+function gapTxtEn(x){ return `${x.nb ? 'Lot ' + x.nb + ' (' + x.hin + ')' : x.lot ? x.hin + ' (lot ' + x.lot + ')' : x.hin}${x.lots>1 ? ' #' + x.lotNo : ''}: branch no. ${x.miss.join(', ')} not scanned (up to ${x.max})`; }
 function markGapsOk(gs){ const ok = LS.get('gapOk', {}); gs.forEach(g => ok[gapSig(g)] = now()); LS.set('gapOk', ok); }
 function renderGaps(){
   const g = pendingGaps(), box = document.getElementById('gapBox');
   const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   box.innerHTML = g.length
     ? `<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:8px 10px;margin:8px 0">
-        <b style="color:#dc2626">⚠ 枝番の抜け（読み取っていない可能性）</b>`
-        + g.map(x => `<div style="font-size:15px;margin-top:4px">${esc(gapTxt(x))}</div>`).join('')
+        <b style="color:#dc2626">⚠ 枝番の抜け（読み取っていない可能性）${LANG === 'en' ? ' / Branch No. gap — possible missed scan. Call a supervisor.' : ''}</b>`
+        + g.map(x => `<div style="font-size:15px;margin-top:4px">${esc(gapTxt(x))}${LANG === 'en' ? `<br><span class="hint">${esc(gapTxtEn(x))}</span>` : ''}</div>`).join('')
         + `<button class="btn" style="width:100%;margin-top:8px;background:#dc2626" onclick="confirmGaps()">確認した（この表示を消す）</button>`
         + `<p class="hint" style="margin:4px 0 0">納番ごとに、枝番（ラベルの「1/8」の1）のOKの記録があるかを調べています。増える順（1→4）でも減る順（4→1）でも、124・431 のように飛んでいると表示します。</p></div>`
     : '';
@@ -930,8 +1030,8 @@ let mino = LS.get('mino', null);        // 未納処理中なら {startAt}
 function renderMino(){
   const band = document.getElementById('minoBand'), btn = document.getElementById('minoBtn');
   band.classList.toggle('hidden', !mino);
-  if(mino) band.textContent = `未納処理中（${mino.startAt.slice(11, 16)}から）　枝番の抜けではロックしません。誤品はいつもどおりロックします`;
-  if(btn) btn.textContent = mino ? '未納処理を終了する' : '未納処理を始める';
+  if(mino) band.textContent = tr(`未納処理中（${mino.startAt.slice(11, 16)}から）　枝番の抜けではロックしません。誤品はいつもどおりロックします`);
+  if(btn) btn.textContent = tr(mino ? '未納処理を終了する' : '未納処理を始める');
 }
 function toggleMino(){ return mino ? endMino() : startMino(); }
 function startMino(){
@@ -1035,7 +1135,7 @@ let lastSentNo = LS.get('lastSentNo', 0);   // ここまでの通し番号は送
 function devLabel(){ const d = cfg.dev || ''; return !d ? '' : (/^[0-9]+$/.test(d) ? '端末' + d : d); }
 function devTag(){ return devLabel() || '端末未設定'; }
 function stamp(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
-function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? devLabel() : '端末番号未設定'; b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
+function renderDev(){ const b=document.getElementById('devBadge'); b.textContent = cfg.dev ? (LANG === 'en' ? 'Device ' + cfg.dev : devLabel()) : (LANG === 'en' ? 'Device no. not set' : '端末番号未設定'); b.style.background = cfg.dev ? '#374151' : '#dc2626'; }
 async function unsentList(){
   const all = dbh ? await dbAll() : [];
   return all.filter(l => (l.no||0) > lastSentNo).sort((a,b)=> a.no - b.no);
@@ -1132,7 +1232,7 @@ function useEnter(){ const m = cfg.term || 'auto'; return m === 'enter' || (m ==
 function gapMs(){ return useEnter() ? 3000 : 400; }   // Enterで区切るときの3秒は、Enterが落ちたときの保険
 function setBusy(on){
   const g = document.getElementById('guide'); if(!g) return;
-  if(on){ if(!g.classList.contains('busy')){ g.classList.add('busy'); g.textContent = '読み取り中… 音が鳴るまで次を読まないでください'; ensureStepsVisible(); } }
+  if(on){ if(!g.classList.contains('busy')){ g.classList.add('busy'); g.textContent = tr('読み取り中… 音が鳴るまで次を読まないでください'); ensureStepsVisible(); } }
   else if(g.classList.contains('busy')){ g.classList.remove('busy'); renderSteps(); }
 }
 function scanTarget(){
@@ -1173,7 +1273,7 @@ function toHalf(s){
 function imeWarn(msg){
   const w = document.getElementById('imeWarn');
   if(!msg){ w.classList.add('hidden'); return; }
-  w.textContent = msg; w.classList.remove('hidden');
+  w.textContent = tr(msg); w.classList.remove('hidden');
 }
 function scanFlush(){
   clearTimeout(scanTimer);
@@ -1557,7 +1657,7 @@ function startWork(){
   document.getElementById('startCover').classList.add('hidden');
   setMode(cfg.mode);
 }
-renderSteps(); renderPosSummary(); renderDev(); renderMino(); initRecords();
+applyLang(); renderPosSummary(); renderDev(); initRecords();
 // 画面を開き直してもNGロックは解除されない。再照合待ちも引き継ぐ
 (function restoreState(){
   recheck = LS.get('recheck', null);
@@ -1569,14 +1669,14 @@ renderSteps(); renderPosSummary(); renderDev(); renderMino(); initRecords();
 /* ---------- 新しい版のお知らせ ---------- */
 // オンラインのときに、公開されている版を調べて、違っていれば上の青い帯で知らせる。タップすると更新する（記録・設定・未納処理・ロックの状態は残る）
 const APP_VER = document.getElementById('verBadge').textContent.trim();
-let newVer = '';
+
 async function checkUpdate(){
   if(!navigator.onLine) return;
   try{
     const r = await fetch('index.html?v=' + Date.now(), {cache:'no-store'});
     if(!r.ok) return;
     const m = (await r.text()).match(/id="verBadge"[^>]*>(ver\.[0-9.]+-[0-9]+)</);
-    if(m && m[1] !== APP_VER){ newVer = m[1]; const b = document.getElementById('updBand'); b.textContent = `新しい版があります（${newVer}）。ここをタップして更新`; b.classList.remove('hidden'); }
+    if(m && m[1] !== APP_VER){ newVer = m[1]; const b = document.getElementById('updBand'); b.textContent = tr(`新しい版があります（${newVer}）。ここをタップして更新`); b.classList.remove('hidden'); }
   }catch(_){}
 }
 function applyUpdate(){
