@@ -105,7 +105,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1><span data-en="Wrong-Part Check">誤品照合</span> <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.14-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1><span data-en="Wrong-Part Check">誤品照合</span> <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.13-3</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button id="langBtn" onclick="toggleLang()" style="margin-right:6px">English</button><button onclick="openSettings()" data-en="⚙ Settings">⚙ 設定</button></div>
 </header>
 <div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
@@ -257,12 +257,6 @@ h2{font-size:16px;margin:4px 0 10px}
         <select id="cfgDetFail"><option value="lock">止める（NG・担当者が解除）</option><option value="manual">今の抜き取り位置で照合する</option></select></div>
       <p class="hint">各メーカーの「客先かんばんの見本QRを読む」を押してから、そのメーカーの客先かんばんをスキャナーで読むと見本として登録されます。照合のとき、読んだ客先かんばんを見本と比べてメーカーを自動で判定し、そのメーカーの抜き取り位置に切り替えます。見本が1件もないときは、これまでどおり手動の位置で照合します。</p>
       <div id="makerTbl"></div>
-    </div>
-
-    <div class="card">
-      <h2>品番の対応表（社内品番と客先品番が、もともと違うもの）</h2>
-      <p class="hint">この表にある組み合わせは、品番が違っても「一致」として照合します（客先QRの中に、対応する客先品番が実際にあるときだけ）。全端末共通です。追加するときは、依頼してください。</p>
-      <div id="pairList"></div>
     </div>
 
     <div class="card">
@@ -431,7 +425,6 @@ const EN_NOTES = [
   [/^再照合でもNG（前回NG 通し番号 (\d+)）$/, 'NG again on re-check (previous NG seq. no. $1)'],
   [/^メーカー:(.+)$/, 'Maker: $1'],
   [/^メーカー判定不可（手動の位置で照合）$/, 'Maker not identified (matched by manual position)'],
-  [/^品番対応表で一致（社内(.+?)＝客先(.+?)(?:：客先QRの(\d+)～(\d+)文字目)?）$/, 'Matched by part-number pair table (internal $1 = customer $2)'],
   [/^未納処理中$/, 'Backorder mode']
 ];
 function tr(s){
@@ -481,20 +474,6 @@ function innerFields(raw){
     return {hin:f[1].toUpperCase(), seb: noSeb ? '' : f[2].toUpperCase(), qty: noSeb && f.length === 3 ? f[2] : (f[3]||''), csv:true};
   }
   return {hin:innerPart(raw), seb:'', qty:'', csv:false};
-}
-// 品番の対応表：社内かんばんの品番と、客先かんばんの品番が、もともと違う組み合わせ（[社内品番, 客先品番]）。
-// 対応表にある組み合わせだけは、品番が違っても、一致として扱う（客先QRの中に、対応する客先品番が実際にあるときだけ）。
-// 全端末で同じ表を使う（アプリの更新で届く）。追加は、依頼してください。
-const PART_PAIRS = [
-  ['47351-25140', '23921-54510']     // 協豊製作所：背番号 MS01
-];
-function pairOf(innerHin){ return PART_PAIRS.filter(([i]) => norm(i) === norm(innerHin)); }
-function pairHit(raw, innerHin){               // 「入っていればOK」方式：客先QRの中に、対応する客先品番があるか
-  for(const [i, c] of pairOf(innerHin)){ const hit = findIn(raw, c); if(hit) return {hit, cust:c}; }
-  return null;
-}
-function pairMatch(custHin, innerHin){         // 位置指定方式：切り出した客先品番と社内品番が、対応表の組み合わせか
-  return pairOf(innerHin).some(([i, c]) => norm(c) === norm(custHin));
 }
 // 社内かんばんの形（AAA,品番,背番号,数量）か。①で読まれたときの読み順ズレ検出用
 function looksInner(raw){
@@ -719,8 +698,7 @@ function onScan(raw){
       if(useHin && !fi.hin){
         return fail('社内かんばんの品番が見つかりません', `社内かんばんのQRに品番がありません（読取内容：${raw.slice(0,40)}）`, {hin:'', inner:raw.slice(0,40), kind:'社内品番なし', raw:cur.raw});
       }
-      let hHit = useHin ? findIn(cur.raw, fi.hin) : null, pair = null;
-      if(useHin && !hHit){ pair = pairHit(cur.raw, fi.hin); if(pair) hHit = pair.hit; }      // 品番が違う組み合わせでも、対応表にあれば一致
+      const hHit = useHin ? findIn(cur.raw, fi.hin) : null;
       const sHit = useSeb ? findIn(cur.raw, fi.seb) : null;
       const inner = fi.hin || fi.seb;
       if(useHin && !hHit){
@@ -731,7 +709,7 @@ function onScan(raw){
         cur.hin = hHit ? hHit.seg : sHit.seg;
         readC[cur.key] = now(); LS.set('readC', readC);
         addLog(cur.hin, inner, 'OK', cur.raw, [
-          hHit ? (pair ? `品番対応表で一致（社内${fi.hin}＝客先${pair.cust}：客先QRの${hHit.pos}～${hHit.end}文字目）` : `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致`) : '',
+          hHit ? `品番：客先QRの${hHit.pos}～${hHit.end}文字目に一致` : '',
           sHit ? `背番号${fi.seb}：客先QRの${sHit.pos}～${sHit.end}文字目に一致` : (fi.seb ? `背番号${fi.seb}（照合なし）` : (mode !== 'hin' ? '社内かんばんに背番号なし→品番で照合' : '')),
           cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
         showOk(fi.seb ? `背番号 ${fi.seb}` : '');
@@ -743,10 +721,9 @@ function onScan(raw){
     const ihin = looksInner(raw) ? innerFields(raw).hin : cut(raw, cfg.iPs, cfg.iPl); lastRaw.i = raw; LS.set('lastRaw', lastRaw);
     const a = norm(cur.hin), b = norm(ihin);
     let match = cfg.cmp==='head' ? (a && b && (a.startsWith(b) || b.startsWith(a))) : (a && a===b);
-    const viaPair = !match && a && b && pairMatch(cur.hin, ihin);      // 品番が違う組み合わせでも、対応表にあれば一致
-    if(match || viaPair){
+    if(match){
       readC[cur.key] = now(); LS.set('readC', readC);
-      addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'', viaPair ? `品番対応表で一致（社内${ihin}＝客先${cur.hin}）` : '',
+      addLog(cur.hin, ihin, 'OK', cur.raw, [cur.maker ? 'メーカー:'+cur.maker : '', cur.makerNote||'',
         cur.recheck ? `NG後の再照合OK（NG 通し番号 ${cur.ngNo}）` : ''].filter(Boolean).join(' / '));
       showOk();
       cur = null; recheck = null; LS.set('recheck', null); renderSteps(); beep(true);
@@ -1427,7 +1404,6 @@ function askPw(){
 }
 function openSettings(){
   if(locked || !askPw()) return;
-  document.getElementById('pairList').innerHTML = PART_PAIRS.length ? '<table><tr><th>社内品番</th><th>客先品番</th></tr>' + PART_PAIRS.map(([i, c]) => `<tr><td>${i}</td><td>${c}</td></tr>`).join('') + '</table>' : '（まだありません）';
   stopCamera();
   const f = (id,v)=>document.getElementById(id).value = v;
   const opts = (id, kind) => document.getElementById(id).innerHTML =
