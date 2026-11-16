@@ -105,7 +105,7 @@ h2{font-size:16px;margin:4px 0 10px}
 </head>
 <body>
 <header>
-  <h1><span data-en="Wrong-Part Check">誤品照合</span> <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.13-3</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
+  <h1><span data-en="Wrong-Part Check">誤品照合</span> <span id="verBadge" style="font-size:12px;font-weight:400;color:#d1d5db">ver.2026.11.16-1</span> <span id="devBadge" style="font-size:13px;background:#374151;padding:2px 8px;border-radius:999px;margin-left:4px"></span> <span id="netBadge" class="hidden" style="font-size:12px;background:#f59e0b;color:#111;padding:2px 8px;border-radius:999px;margin-left:6px">オフライン</span></h1>
   <div><button id="langBtn" onclick="toggleLang()" style="margin-right:6px">English</button><button onclick="openSettings()" data-en="⚙ Settings">⚙ 設定</button></div>
 </header>
 <div id="updBand" class="hidden" onclick="applyUpdate()" style="background:#2563eb;color:#fff;font-weight:700;text-align:center;padding:10px;font-size:16px;cursor:pointer"></div>
@@ -357,15 +357,18 @@ function seenAt(key){
   return '';
 }
 // 客先QR全文から、かんばん枚数の枝番（「K」と「Z」の間の数字。例：…P017K34Z… → 34）を取り出す。なければ空
-// もう1つの形式（「JT」「JY」など、J＋英字＋数字7桁で始まるQR）は、末尾が「枝番6桁＋収容数5桁＋背番号4文字＋日付6桁」。ラベルの「枝番 2106」（002106）を枝番にする
+// もう1つの形式（「JT」「JY」など、J＋英字＋英数字7文字で始まるQR。例：JT3485900…、JT7364Z6R6…）は、末尾が「枝番6桁＋収容数5桁＋背番号4文字＋日付6桁」。ラベルの「枝番 2106」（002106）を枝番にする
+// （以前は「J＋英字＋数字7桁」だけを見ていたため、JT7364Z6R6… のように英字が混じるQRで、枝番が取り出せなかった）
+function isJfmt(t){ return /^J[A-Z][0-9A-Z]{7}/.test(String(t||'')); }
 function edaOf(raw){
-  const t = String(raw||''), m = t.match(/K(\d+)Z/);
-  if(m) return String(+m[1]);
-  const j = /^J[A-Z]\d{7}/.test(t) && t.match(/(\d{6})\d{5}[0-9A-Z]{4}\d{6}\s*$/);
-  return j ? String(+j[1]) : '';
+  const t = String(raw||'');
+  const j = isJfmt(t) && t.match(/(\d{6})\d{5}[0-9A-Z]{4}\d{6}\s*$/);
+  if(j) return String(+j[1]);
+  const m = t.match(/K(\d+)Z/);
+  return m ? String(+m[1]) : '';
 }
 // 「JT」「JY」形式のロット（納入日＋便＋ロット記号。例：2026102801 C0860）。納番がない形式の抜けチェックの単位にする
-function lotOf(raw){ const m = /^J[A-Z]\d{7}/.test(String(raw||'')) && String(raw).match(/(20\d{8})\s+([A-Z]\d{4})\s/); return m ? m[1] + ' ' + m[2] : ''; }
+function lotOf(raw){ const m = isJfmt(raw) && String(raw).match(/(20\d{8})\s+([A-Z]\d{4})\s/); return m ? m[1] + ' ' + m[2] : ''; }
 // 客先QR全文から納番（ラベルの「納番：J19780」。「10K」の次の6文字）を取り出す。枝番はこの納番の中の何枚目か（ラベルの「1/8」の1）
 function nbanOf(raw){ const m = String(raw||'').match(/10K([0-9A-Z]{6})20P/); return m ? m[1] : ''; }
 function edaTxt(raw){ const e = edaOf(raw), n = nbanOf(raw); return e ? `${n ? '納番 ' + n + '　' : ''}枝番 ${e}　／　` : ''; }
